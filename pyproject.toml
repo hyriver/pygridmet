@@ -1,0 +1,273 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [
+  "setuptools>=60",
+  "setuptools-scm>=8",
+]
+
+[project]
+name = "pygridmet"
+description = "Access daily, monthly, and annual climate data via the Daymet web service."
+readme = "README.rst"
+license = {text = "MIT"}
+authors = [{name = "Taher Chegini", email = "cheginit@gmail.com"}]
+requires-python = ">=3.8"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Atmospheric Science",
+  "Topic :: Scientific/Engineering :: GIS",
+  "Topic :: Scientific/Engineering :: Hydrology",
+  "Typing :: Typed",
+]
+dynamic = [
+  "version",
+]
+dependencies = [
+  "async-retriever<0.16,>=0.15.2",
+  "click>=0.7",
+  "geopandas>=0.10",
+  "numpy>=1.21",
+  "pandas>=1",
+  "pygeoogc<0.16,>=0.15.2",
+  "pygeoutils<0.16,>=0.15.2",
+  "pyproj>=3.0.1",
+  "shapely>=2",
+  "xarray>=2023.01",
+]
+[project.optional-dependencies]
+speedup = [
+  "numba",
+]
+test = [
+  "pyarrow>=1.0.1",
+  "pytest-cov",
+  "pytest-sugar",
+  "pytest-xdist[psutil]",
+]
+[project.urls]
+CI = "https://github.com/hyriver/pygridmet/actions"
+Changelog = "https://docs.hyriver.io/changelogs/pygridmet.html"
+Homepage = "https://docs.hyriver.io/readme/pygridmet.html"
+Issues = "https://github.com/hyriver/pygridmet/issues"
+[project.scripts]
+pygridmet = "pygridmet.cli:cli"
+
+[tool.setuptools]
+include-package-data = true
+license-files = ["LICENSE"]
+platforms = ["any"]
+zip-safe = false
+
+[tool.setuptools.package-data]
+pygridmet = ["py.typed"]
+
+[tool.setuptools.packages]
+find = {namespaces = false}
+
+[tool.setuptools_scm]
+fallback_version = "999"
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+target-version = "py38"
+select = [
+    # flake8-bugbear
+    "B",
+    # flake8-comprehensions
+    "C4",
+    # pydocstyle
+    "D",
+    # Error
+    "E",
+    # pyflakes
+    "F",
+    # isort
+    "I",
+    # flake8-implicit-str-concat
+    "ISC",
+    # pep8-naming
+    "N",
+    # pygrep-hooks
+    "PGH",
+    # flake8-pytest-style
+    "PT",
+    # flake8-use-pathlib
+    "PTH",
+    # flake8-quotes
+    "Q",
+    # bandit
+    "S",
+    # flake8-simplify
+    "SIM",
+    # flake8-print
+    "T20",
+    # tryceratops
+    "TRY",
+    # pyupgrade
+    "UP",
+    # Warning
+    "W",
+    # flake8-2020
+    "YTT",
+    # flake8-debugger
+    "T10",
+    # flake8-gettext
+    "INT",
+    # pylint
+    "PLC",
+    "PLE",
+    "PLR",
+    "PLW",
+    # misc lints
+    "PIE",
+    # flake8-pyi
+    "PYI",
+    # tidy imports
+    "TID",
+    # type-checking imports
+    "TCH",
+    # Ruff-specific rules
+    "RUF",
+]
+
+exclude = [
+    "__pycache__",
+    ".nox",
+]
+
+ignore = [
+    "D103",
+    "D105",
+    "E501",
+    "PLR2004",
+    "PLR0913",
+]
+line-length = 100
+
+[tool.ruff.flake8-bugbear]
+extend-immutable-calls = [
+    "chr",
+    "typer.Argument",
+    "typer.Option",
+]
+
+[tool.ruff.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.per-file-ignores]
+"tests/*.py" = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
+    # use of "assert"
+    "S101",
+    # use of "exec"
+    "S102",
+    # possible hardcoded password
+    "S106",
+    # use of "eval"
+    "PGH001",
+    # Mutable class attributes
+    "RUF012",
+]
+
+[tool.ruff.isort]
+known-first-party = [
+  "async_retriever",
+  "pygeoogc",
+  "pygeoutils",
+  "pynhd",
+  "py3dep",
+  "hydrosignatures",
+  "pygeohydro",
+  "pygridmet",
+  "pynldas2",
+]
+
+[tool.pycln]
+all = true
+expand_stars = true
+no_gitignore = false
+verbose = true
+
+[tool.codespell]
+skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.nox,**/us_abbrs.py,cache"
+ignore-words-list = "gage,gages,paramss,trough"
+
+[tool.pytest.ini_options]
+addopts = "--ignore=noxfile.py -n=auto -v --cov=pygridmet --cov-report xml --durations=5"
+doctest_optionflags = 'NORMALIZE_WHITESPACE IGNORE_EXCEPTION_DETAIL NUMBER'
+filterwarnings = [
+  "ignore:.*distutils.*",
+  "ignore:.*--rsyncdir command line argument.*",
+  "ignore:.*numpy.ndarray size changed.*",
+  "ignore:.*'cgi' is deprecated.*",
+  "ignore:.*Calling float on a single element.*",
+  "ignore:.*Shapely GEOS version.*",
+]
+testpaths = [
+  "tests",
+  "pygridmet"
+]
+markers = [
+  "speedup: Tests that require numba",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+  'raise ServiceUnavailableError',
+  "if TYPE_CHECKING:"
+]
+ignore_errors = true
+
+[tool.coverage.run]
+branch = true
+omit = [
+  "**/__init__.py",
+  "**/print_versions.py"
+]
+parallel = true
+source = ['pygridmet']
+
+[tool.pyright]
+exclude = [
+  ".nox/",
+  "**/__pycache__",
+  "**/__init__.py",
+  "tests/"
+]
+include = ["pygridmet"]
+reportMissingTypeStubs = false
+reportUnknownArgumentType = false
+reportUnknownLambdaType = false
+reportUnknownMemberType = false
+reportUnknownParameterType = false
+reportUnknownVariableType = false
+reportUnnecessaryIsInstance = false
+reportUntypedFunctionDecorator = false
+typeCheckingMode = "strict"
+
+[tool.fixit]
+formatter = "ufmt"
+
+[tool.refurb]
+python_version = "3.8"
+quiet = true

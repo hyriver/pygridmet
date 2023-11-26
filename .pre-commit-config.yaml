@@ -1,0 +1,122 @@
+repos:
+- repo: https://github.com/hadialqattan/pycln
+  rev: v2.4.0
+  hooks:
+  - id: pycln
+    name: Find and remove unused import statements with pycln
+    args: [--config=pyproject.toml]
+
+- repo: https://github.com/bwhmather/ssort
+  rev: v0.11.6
+  hooks:
+  - id: ssort
+    name: Sort top level statements with ssort
+
+- repo: https://github.com/MarcoGorelli/absolufy-imports
+  rev: v0.3.1
+  hooks:
+  - id: absolufy-imports
+    name: Convert relative imports to absolute with absolufy-imports
+
+- repo: https://github.com/Instagram/Fixit
+  rev: v2.1.0
+  hooks:
+  - id: fixit-fix
+
+- repo: https://github.com/psf/black
+  rev: 23.11.0
+  hooks:
+  - id: black
+    name: Autoformat with black
+
+- repo: https://github.com/asottile/blacken-docs
+  rev: 1.16.0
+  hooks:
+  - id: blacken-docs
+    name: Autoformat codes in docstrings with blacken-docs
+    additional_dependencies: [black]
+    args: [-t, py38, -l, '100']
+
+- repo: https://github.com/charliermarsh/ruff-pre-commit
+  rev: v0.1.6
+  hooks:
+  - id: ruff
+    name: Linting with Ruff
+    args: [--fix, --exit-non-zero-on-fix]
+
+- repo: https://github.com/PyCQA/doc8
+  rev: v1.1.1
+  hooks:
+  - id: doc8
+    name: Check documentation formats with doc8
+    args: [--max-line-length, '100']
+
+- repo: https://github.com/codespell-project/codespell
+  rev: v2.2.6
+  hooks:
+  - id: codespell
+    name: Check common misspellings in text files with codespell.
+    additional_dependencies:
+    - tomli
+
+- repo: https://github.com/dosisod/refurb
+  rev: v1.24.0
+  hooks:
+  - id: refurb
+    name: Modernizing Python codebases using Refurb
+    additional_dependencies:
+    - numpy
+
+- repo: https://github.com/tox-dev/pyproject-fmt
+  rev: 1.5.1
+  hooks:
+  - id: pyproject-fmt
+    name: Apply a consistent format to pyproject.toml
+
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.5.0
+  hooks:
+  - id: check-added-large-files
+    args: [--maxkb=50000]
+  - id: mixed-line-ending
+    args: [--fix=lf]
+  - id: check-ast
+  - id: check-builtin-literals
+  - id: check-case-conflict
+  - id: check-docstring-first
+  - id: check-shebang-scripts-are-executable
+  - id: check-merge-conflict
+  - id: check-json
+  - id: check-toml
+  - id: check-xml
+  - id: check-yaml
+  - id: debug-statements
+  - id: destroyed-symlinks
+  - id: detect-private-key
+  - id: end-of-file-fixer
+    exclude: ^LICENSE|\.(html|csv|txt|svg|py)$
+  - id: pretty-format-json
+    args: [--autofix, --no-ensure-ascii, --no-sort-keys]
+  - id: trailing-whitespace
+    args: [--markdown-linebreak-ext=md]
+    exclude: \.(html|svg)$
+
+- repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+  rev: v2.11.0
+  hooks:
+  - id: pretty-format-yaml
+    args: [--autofix, --indent, '2']
+
+- repo: local
+  hooks:
+  - id: future-annotations
+    name: import annotations from __future__
+    entry: from __future__ import annotations
+    language: pygrep
+    args: [--negate]
+    files: ^pygeohydro/
+    types: [python]
+    exclude: |
+      (?x)
+      /(__init__\.py)|(conftest\.py)$
+      |/tests/
