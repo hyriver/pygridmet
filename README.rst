@@ -71,11 +71,11 @@ PyGeoUtils_      Utilities for manipulating geospatial, (Geo)JSON, and (Geo)TIFF
 .. _PyNHD: https://github.com/hyriver/pynhd
 .. _Py3DEP: https://github.com/hyriver/py3dep
 .. _PyDaymet: https://github.com/hyriver/pydaymet
-.. _PyGridMet: https://github.com/hyriver/pygridmet
+.. _PyGridMET: https://github.com/hyriver/pygridmet
 .. _PyNLDAS2: https://github.com/hyriver/pynldas2
 .. _HydroSignatures: https://github.com/hyriver/hydrosignatures
 
-PyGridMet: Daily climate data through GridMet
+PyGridMET: Daily climate data through GridMet
 ---------------------------------------------
 
 .. image:: https://img.shields.io/pypi/v/pygridmet.svg
@@ -121,7 +121,7 @@ PyGridMet: Daily climate data through GridMet
 Features
 --------
 
-PyGridMet is a part of `HyRiver <https://github.com/hyriver/HyRiver>`__ software stack that
+PyGridMET is a part of `HyRiver <https://github.com/hyriver/HyRiver>`__ software stack that
 is designed to aid in hydroclimate analysis through web services. This package provides
 access to daily climate data over contermonious US (CONUS) from
 `GridMet <https://www.climatologylab.org/gridmet.html>`__ database using NetCDF
@@ -131,13 +131,13 @@ Subset Service (NCSS). Both single pixel (using ``get_bycoords`` function) and g
 
 You can find some example notebooks `here <https://github.com/hyriver/HyRiver-examples>`__.
 
-Moreover, under the hood, PyGridMet uses
+Moreover, under the hood, PyGridMET uses
 `PyGeoOGC <https://github.com/hyriver/pygeoogc>`__ and
 `AsyncRetriever <https://github.com/hyriver/async-retriever>`__ packages
 for making requests in parallel and storing responses in chunks. This improves the
 reliability and speed of data retrieval significantly.
 
-You can also try using PyGridMet without installing
+You can also try using PyGridMET without installing
 it on your system by clicking on the binder badge. A Jupyter Lab
 instance with the HyRiver stack pre-installed will be launched in your web browser, and you
 can start coding!
@@ -166,13 +166,13 @@ If you use any of HyRiver packages in your research, we appreciate citations:
 Installation
 ------------
 
-You can install PyGridMet using ``pip`` as follows:
+You can install PyGridMET using ``pip`` as follows:
 
 .. code-block:: console
 
     $ pip install pygridmet
 
-Alternatively, PyGridMet can be installed from the ``conda-forge`` repository
+Alternatively, PyGridMET can be installed from the ``conda-forge`` repository
 using `Conda <https://docs.conda.io/en/latest/>`__:
 
 .. code-block:: console
@@ -182,7 +182,7 @@ using `Conda <https://docs.conda.io/en/latest/>`__:
 Quick start
 -----------
 
-You can use PyGridMet using command-line or as a Python library. The commanda-line
+You can use PyGridMET using command-line or as a Python library. The commanda-line
 provides access to two functionality:
 
 - Getting gridded climate data: You must create a ``geopandas.GeoDataFrame`` that contains
@@ -204,7 +204,7 @@ provides access to two functionality:
     $ pygridmet -h
     Usage: pygridmet [OPTIONS] COMMAND [ARGS]...
 
-    Command-line interface for PyGridMet.
+    Command-line interface for PyGridMET.
 
     Options:
     -h, --help  Show this message and exit.
@@ -274,9 +274,9 @@ And, the ``geometry`` sub-command is as follows:
     --disable_ssl         Pass to disable SSL certification verification.
     -h, --help            Show this message and exit.
 
-Now, let's see how we can use PyGridMet as a library.
+Now, let's see how we can use PyGridMET as a library.
 
-PyGridMet offers two functions for getting climate data; ``get_bycoords`` and ``get_bygeom``.
+PyGridMET offers two functions for getting climate data; ``get_bycoords`` and ``get_bygeom``.
 The arguments of these functions are identical except the first argument where the latter
 should be polygon and the former should be a coordinate (a tuple of length two as in (x, y)).
 The input geometry or coordinate can be in any valid CRS (defaults to ``EPSG:4326``). The
