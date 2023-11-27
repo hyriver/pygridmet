@@ -285,6 +285,30 @@ years like ``[2000, 2005]``. It is noted that both functions have a ``snow`` fla
 snow from precipitation using
 `Martinez and Gupta (2010) <https://doi.org/10.1029/2009WR008294>`__ method.
 
+We can get a dataframe of available variables and their info by calling
+``GridMET().gridmet_table``:
+
++----------------------------------------+--------+-------------------------------------------------+----------------------+
+| variable                               | abbr   | long_name                                       | units                |
++========================================+========+=================================================+======================+
+| Precipitation                          | pr     | precipitation_amount                            | mm                   |
+| Maximum Relative Humidity              | rmax   | daily_maximum_relative_humidity                 | %                    |
+| Minimum Relative Humidity              | rmin   | daily_minimum_relative_humidity                 | %                    |
+| Specific Humidity                      | sph    | daily_mean_specific_humidity                    | kg/kg                |
+| Surface Radiation                      | srad   | daily_mean_shortwave_radiation_at_surface       | W/m2                 |
+| Wind Direction                         | th     | daily_mean_wind_direction                       | Klockwise from north |
+| Minimum Air Temperature                | tmmn   | daily_minimum_temperature                       | K                    |
+| Maximum Air Temperature                | tmmx   | daily_maximum_temperature                       | K                    |
+| Wind Speed                             | vs     | daily_mean_wind_speed                           | m/s                  |
+| Burning Index                          | bi     | daily_mean_burning_index_g                      | -                    |
+| Fuel Moisture (100-hr)                 | fm100  | dead_fuel_moisture_100hr                        | %                    |
+| Fuel Moisture (1000-hr)                | fm1000 | dead_fuel_moisture_1000hr                       | %                    |
+| Energy Release Component               | erc    | daily_mean_energy_release_component-g           | -                    |
+| Reference Evapotranspiration (Alfalfa) | etr    | daily_mean_reference_evapotranspiration_alfalfa | mm                   |
+| Reference Evapotranspiration (Grass)   | pet    | daily_mean_reference_evapotranspiration_grass   | mm                   |
+| Vapor Pressure Deficit                 | vpd    | daily_mean_vapor_pressure_deficit               | kPa                  |
++----------------------------------------+--------+-------------------------------------------------+----------------------+
+
 .. code-block:: python
 
     from pynhd import NLDI
@@ -292,7 +316,7 @@ snow from precipitation using
 
     geometry = NLDI().get_basins("01031500").geometry[0]
 
-    var = ["prcp", "tmin"]
+    var = ["pr", "tmmn"]
     dates = ("2000-01-01", "2000-06-30")
 
     daily = gridmet.get_bygeom(geometry, dates, variables=var, snow=True)
