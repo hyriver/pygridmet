@@ -33,8 +33,8 @@ and "help wanted" is open to whoever wants to implement it.
 Write Documentation
 ~~~~~~~~~~~~~~~~~~~
 
-PyGridMet could always use more documentation, whether as part of the
-official PyGridMet docs, in docstrings, or even on the web in blog posts,
+PyGridMET could always use more documentation, whether as part of the
+official PyGridMET docs, in docstrings, or even on the web in blog posts,
 articles, and such.
 
 Submit Feedback
@@ -54,7 +54,7 @@ Get Started!
 
 Ready to contribute? Here's how to set up pygridmet for local development.
 
-1. Fork the PyGridMet repo through the GitHub website.
+1. Fork the PyGridMET repo through the GitHub website.
 2. Clone your fork locally and add the main ``pygridmet`` as the upstream remote:
 
 .. code-block:: console
