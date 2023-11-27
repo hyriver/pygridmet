@@ -1,4 +1,4 @@
-"""Top-level package for PyGridMet."""
+"""Top-level package for PyGridMET."""
 from importlib.metadata import PackageNotFoundError, version
 
 from pygridmet.core import GridMet

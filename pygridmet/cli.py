@@ -1,4 +1,4 @@
-"""Command-line interface for PyGridMet."""
+"""Command-line interface for PyGridMET."""
 from __future__ import annotations
 
 from pathlib import Path
