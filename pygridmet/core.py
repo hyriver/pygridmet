@@ -1,4 +1,4 @@
-"""Core class for the GridMet functions."""
+"""Core class for the GridMET functions."""
 # pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
@@ -50,12 +50,12 @@ DATE_FMT = "%Y-%m-%d"
 T_RAIN = 2.5  # degC
 T_SNOW = 0.6  # degC
 
-__all__ = ["GridMet"]
+__all__ = ["GridMET"]
 
 
 @dataclass
-class GridMetBase:
-    """Base class for validating GridMet requests.
+class GridMETBase:
+    """Base class for validating GridMET requests.
 
     Parameters
     ----------
@@ -126,8 +126,8 @@ def _separate_snow(
     return snow
 
 
-class GridMet:
-    """Base class for GridMet requests.
+class GridMET:
+    """Base class for GridMET requests.
 
     Parameters
     ----------
@@ -152,7 +152,7 @@ class GridMet:
     ) -> None:
         _variables = ["all"] if variables is None else variables
         _variables = [_variables] if isinstance(_variables, str) else _variables
-        validated = GridMetBase(variables=_variables, snow=snow)
+        validated = GridMETBase(variables=_variables, snow=snow)
         self.variables = validated.variables
         self.snow = validated.snow
 
@@ -285,9 +285,9 @@ class GridMet:
         return {"years": ",".join(str(y) for y in years)}
 
     def dates_tolist(self, dates: tuple[str, str]) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
-        """Correct dates for GridMet accounting for leap years.
+        """Correct dates for GridMET accounting for leap years.
 
-        GridMet doesn't account for leap years and removes Dec 31 when
+        GridMET doesn't account for leap years and removes Dec 31 when
         it's leap year.
 
         Parameters
@@ -298,7 +298,7 @@ class GridMet:
         Returns
         -------
         list
-            All the dates in the GridMet database within the provided date range.
+            All the dates in the GridMET database within the provided date range.
         """
         date_dict = self.dates_todict(dates)
         start = pd.to_datetime(date_dict["start"])
@@ -312,9 +312,9 @@ class GridMet:
         return [(y[0], y[-1]) for y in years]
 
     def years_tolist(self, years: list[int] | int) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
-        """Correct dates for GridMet accounting for leap years.
+        """Correct dates for GridMET accounting for leap years.
 
-        GridMet doesn't account for leap years and removes Dec 31 when
+        GridMET doesn't account for leap years and removes Dec 31 when
         it's leap year.
 
         Parameters
@@ -325,7 +325,7 @@ class GridMet:
         Returns
         -------
         list
-            All the dates in the GridMet database within the provided date range.
+            All the dates in the GridMET database within the provided date range.
         """
         date_dict = self.years_todict(years)
         start_list, end_list = [], []

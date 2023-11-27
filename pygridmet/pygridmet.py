@@ -1,4 +1,4 @@
-"""Access the GridMet database for both single single pixel and gridded queries."""
+"""Access the GridMET database for both single single pixel and gridded queries."""
 # pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import pygeoogc as ogc
 import pygeoutils as geoutils
 from pygeoogc import ServiceError, ServiceURL
 from pygeoutils import Coordinates
-from pygridmet.core import T_RAIN, T_SNOW, GridMet
+from pygridmet.core import T_RAIN, T_SNOW, GridMET
 from pygridmet.exceptions import InputRangeError, InputTypeError
 
 if TYPE_CHECKING:
@@ -42,14 +42,14 @@ def _coord_urls(
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     long_names: dict[str, str],
 ) -> Generator[list[tuple[str, dict[str, dict[str, str]]]], None, None]:
-    """Generate an iterable URL list for downloading GridMet data.
+    """Generate an iterable URL list for downloading GridMET data.
 
     Parameters
     ----------
     coord : tuple of length 2
         Coordinates in EPSG:4326 CRS (lon, lat)
     variables : list
-        A list of GridMet variables
+        A list of GridMET variables
     dates : list
         A list of dates
     long_names : dict
@@ -102,7 +102,7 @@ def _get_lon_lat(
 def _by_coord(
     lon: float,
     lat: float,
-    gridmet: GridMet,
+    gridmet: GridMET,
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     snow: bool,
     snow_params: dict[str, float] | None,
@@ -149,7 +149,7 @@ def get_bycoords(
     ssl: bool = True,
     to_xarray: bool = False,
 ) -> pd.DataFrame | xr.Dataset:
-    """Get point-data from the GridMet database at 1-km resolution.
+    """Get point-data from the GridMET database at 1-km resolution.
 
     This function uses THREDDS data service to get the coordinates
     and supports getting monthly and annual summaries of the climate
@@ -208,7 +208,7 @@ def get_bycoords(
     ----------
     .. footbibliography::
     """
-    gridmet = GridMet(variables, snow)
+    gridmet = GridMET(variables, snow)
     gridmet.check_dates(dates)
 
     if isinstance(dates, tuple):
@@ -263,14 +263,14 @@ def _gridded_urls(
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     long_names: dict[str, str],
 ) -> Generator[tuple[str, dict[str, dict[str, str]]], None, None]:
-    """Generate an iterable URL list for downloading GridMet data.
+    """Generate an iterable URL list for downloading GridMET data.
 
     Parameters
     ----------
     bounds : tuple of length 4
         Bounding box (west, south, east, north)
     variables : list
-        A list of GridMet variables
+        A list of GridMET variables
     dates : list
         A list of dates
     long_names : dict
@@ -322,7 +322,7 @@ def get_bygeom(
     snow_params: dict[str, float] | None = None,
     ssl: bool = True,
 ) -> xr.Dataset:
-    """Get gridded data from the GridMet database at 1-km resolution.
+    """Get gridded data from the GridMET database at 1-km resolution.
 
     Parameters
     ----------
@@ -370,7 +370,7 @@ def get_bygeom(
     ----------
     .. footbibliography::
     """
-    gridmet = GridMet(variables, snow)
+    gridmet = GridMET(variables, snow)
     gridmet.check_dates(dates)
 
     if isinstance(dates, tuple):
@@ -409,7 +409,7 @@ def get_bygeom(
     except ValueError as ex:
         msg = " ".join(
             (
-                "GridMet did NOT process your request successfully.",
+                "GridMET did NOT process your request successfully.",
                 "Check your inputs and try again.",
             )
         )

@@ -1,7 +1,7 @@
 """Top-level package for PyGridMET."""
 from importlib.metadata import PackageNotFoundError, version
 
-from pygridmet.core import GridMet
+from pygridmet.core import GridMET
 from pygridmet.exceptions import (
     InputRangeError,
     InputTypeError,
@@ -18,7 +18,7 @@ except PackageNotFoundError:
     __version__ = "999"
 
 __all__ = [
-    "GridMet",
+    "GridMET",
     "get_bycoords",
     "get_bygeom",
     "potential_et",
