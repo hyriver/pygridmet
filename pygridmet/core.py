@@ -223,7 +223,7 @@ class GridMET:
                     "%",
                     "kg/kg",
                     "W/m2",
-                    "Klockwise from north",
+                    "Degrees clockwise from north",
                     "K",
                     "K",
                     "m/s",
