@@ -322,7 +322,7 @@ We can get a dataframe of available variables and their info by calling
 | Reference Evapotranspiration (Grass)   | ``pet``    | mm                           |
 +----------------------------------------+------------+------------------------------+
 | Vapor Pressure Deficit                 | ``vpd``    | kPa                          |
-+----------------------------------------+------------+------------------------------+        
++----------------------------------------+------------+------------------------------+
 
 .. code-block:: python
 
