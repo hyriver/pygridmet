@@ -7,6 +7,7 @@ import io
 import itertools
 import re
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, Generator, Iterable, Sequence, Union, cast
 
 import numpy as np
@@ -23,15 +24,13 @@ from pygridmet.core import T_RAIN, T_SNOW, GridMET
 from pygridmet.exceptions import InputRangeError, InputTypeError
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import pyproj
     from shapely import MultiPolygon, Polygon
 
     CRSTYPE = Union[int, str, pyproj.CRS]
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%SZ"
-MAX_CONN = 10
+MAX_CONN = 4
 
 __all__ = ["get_bycoords", "get_bygeom"]
 
@@ -151,10 +150,6 @@ def get_bycoords(
 ) -> pd.DataFrame | xr.Dataset:
     """Get point-data from the GridMET database at 1-km resolution.
 
-    This function uses THREDDS data service to get the coordinates
-    and supports getting monthly and annual summaries of the climate
-    data directly from the server.
-
     Parameters
     ----------
     coords : tuple or list of tuples
@@ -203,10 +198,6 @@ def get_bycoords(
     ... )
     >>> clm["pr (mm)"].mean()
     9.677
-
-    References
-    ----------
-    .. footbibliography::
     """
     gridmet = GridMET(variables, snow)
     gridmet.check_dates(dates)
@@ -313,6 +304,15 @@ def _open_dataset(f: Path) -> xr.Dataset:
             return ds.load()
 
 
+def _match(f: str) -> str:
+    """Match the variable name in the file name."""
+    pattern = r"met_(.*?)_1979"
+    match = re.search(pattern, f)
+    if match is None:
+        raise ValueError
+    return match.group(1)
+
+
 def get_bygeom(
     geometry: Polygon | MultiPolygon | tuple[float, float, float, float],
     dates: tuple[str, str] | int | list[int],
@@ -365,10 +365,6 @@ def get_bygeom(
     >>> clm = gridmet.get_bygeom(geometry, 2010, variables="tmmn")
     >>> clm["tmmn"].mean().item()
     274.167
-
-    References
-    ----------
-    .. footbibliography::
     """
     gridmet = GridMET(variables, snow)
     gridmet.check_dates(dates)
@@ -395,27 +391,51 @@ def get_bygeom(
     urls = cast("list[str]", list(urls))
     kwds = cast("list[dict[str, dict[str, str]]]", list(kwds))
 
-    clm_files = ogc.streaming_download(
-        urls,
-        kwds,
-        file_extention="nc",
-        ssl=ssl,
-        n_jobs=MAX_CONN,
-    )
-    try:
-        # open_mfdataset can run into too many open files error so we use merge
-        # https://docs.xarray.dev/en/stable/user-guide/io.html#reading-multi-file-datasets
-        clm = xr.merge(_open_dataset(f) for f in clm_files)
-    except ValueError as ex:
+    clm_files = [
+        Path("cache", f"{_match(u)}_{ogc.create_request_key('GET', u, **p)}.nc")
+        for u, p in zip(urls, kwds)
+    ]
+    clm_files_full = clm_files.copy()
+    long2abbr = {v: k for k, v in gridmet.long_names.items()}
+    clm = None
+    for _ in range(10):
+        _ = ogc.streaming_download(urls, kwds, clm_files, ssl=ssl, n_jobs=MAX_CONN)
+        try:
+            # open_mfdataset can run into too many open files error so we use merge
+            # https://docs.xarray.dev/en/stable/user-guide/io.html#reading-multi-file-datasets
+            clm = xr.merge(_open_dataset(f) for f in clm_files_full)
+            clm = xr.where(clm < gridmet.missing_value, clm, np.nan, keep_attrs=True)
+        except ValueError:
+            _ = [f.unlink() for f in clm_files]
+            continue
+        else:
+            # Sometimes the server returns corrupted files, so we check for NaNs
+            nans = [
+                p for p, v in clm.mean(dim=["lon", "lat"]).isnull().sum().any().items() if v.item()
+            ]
+            if nans:
+                clm = None
+                nans = [long2abbr[n] for n in nans]
+                urls, kwds, clm_files = zip(
+                    *(
+                        (u, k, f)
+                        for u, k, f in zip(urls, kwds, clm_files)
+                        if f.name.split("_")[0] in nans
+                    )
+                )
+                _ = [f.unlink() for f in clm_files]
+                continue
+            break
+
+    if clm is None:
         msg = " ".join(
             (
                 "GridMET did NOT process your request successfully.",
                 "Check your inputs and try again.",
             )
         )
-        raise ServiceError(msg) from ex
+        raise ServiceError(msg)
 
-    clm = xr.where(clm < gridmet.missing_value, clm, np.nan, keep_attrs=True)
     for v in clm.data_vars:
         clm[v] = clm[v].rio.write_nodata(np.nan)
     clm = geoutils.xd_write_crs(clm, 4326, "spatial_ref")
