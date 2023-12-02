@@ -342,7 +342,7 @@ class GridMET:
         clm = climate.copy()
         clm["snow (mm)"] = _separate_snow(
             clm["pr (mm)"].to_numpy("f8"),
-            clm["tmmn (K)"].to_numpy("f8"),
+            clm["tmmn (K)"].to_numpy("f8") - 273.15,
             np.float64(t_rain),
             np.float64(t_snow),
         )
@@ -370,7 +370,7 @@ class GridMET:
         clm["snow"] = xr.apply_ufunc(
             snow_func,
             clm["pr"],
-            clm["tmmn"] - 273.15,
+            clm["tmmn"],
             t_rain,
             t_snow,
             input_core_dims=[["time"], ["time"], [], []],
