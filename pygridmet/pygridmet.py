@@ -410,9 +410,7 @@ def get_bygeom(
             _ = [f.unlink() for f in clm_files]
             continue
         else:
-            nans = [
-                p for p, v in clm.isnull().sum().any().items() if v.item()
-            ]
+            nans = [p for p, v in clm.isnull().sum().any().items() if v.item()]
             if nans:
                 clm = None
                 nans = [long2abbr[n] for n in nans]
