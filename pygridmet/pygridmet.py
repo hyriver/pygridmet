@@ -63,7 +63,7 @@ def _coord_urls(
     return (
         [
             (
-                f"{ServiceURL().restful.gridmet}/agg_met_{v}_1979_CurrentYear_CONUS.nc",
+                f"{ServiceURL().restful.gridmet}/agg_met_{v}_1979_CurrentYear_CONUS.nc#fillmismatch",
                 {
                     "params": {
                         "var": long_names[v],
@@ -275,7 +275,7 @@ def _gridded_urls(
     west, south, east, north = bounds
     return (
         (
-            f"{ServiceURL().restful.gridmet}/agg_met_{v}_1979_CurrentYear_CONUS.nc",
+            f"{ServiceURL().restful.gridmet}/agg_met_{v}_1979_CurrentYear_CONUS.nc#fillmismatch",
             {
                 "params": {
                     "var": long_names[v],
@@ -398,20 +398,20 @@ def get_bygeom(
     clm_files_full = clm_files.copy()
     long2abbr = {v: k for k, v in gridmet.long_names.items()}
     clm = None
-    for _ in range(10):
+    # Sometimes the server returns NaNs, so we must check for that, remove
+    # the files containing NaNs, and try again.
+    for _ in range(15):
         _ = ogc.streaming_download(urls, kwds, clm_files, ssl=ssl, n_jobs=MAX_CONN)
         try:
             # open_mfdataset can run into too many open files error so we use merge
             # https://docs.xarray.dev/en/stable/user-guide/io.html#reading-multi-file-datasets
-            clm = xr.merge(_open_dataset(f) for f in clm_files_full)
-            clm = xr.where(clm < gridmet.missing_value, clm, np.nan, keep_attrs=True)
+            clm = xr.merge(_open_dataset(f) for f in clm_files_full).astype("f4")
         except ValueError:
             _ = [f.unlink() for f in clm_files]
             continue
         else:
-            # Sometimes the server returns corrupted files, so we check for NaNs
             nans = [
-                p for p, v in clm.mean(dim=["lon", "lat"]).isnull().sum().any().items() if v.item()
+                p for p, v in clm.isnull().sum().any().items() if v.item()
             ]
             if nans:
                 clm = None
@@ -436,6 +436,7 @@ def get_bygeom(
         )
         raise ServiceError(msg)
 
+    clm = xr.where(clm < gridmet.missing_value, clm, np.nan, keep_attrs=True)
     for v in clm.data_vars:
         clm[v] = clm[v].rio.write_nodata(np.nan)
     clm = geoutils.xd_write_crs(clm, 4326, "spatial_ref")
