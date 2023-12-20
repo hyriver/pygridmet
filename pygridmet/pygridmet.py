@@ -1,5 +1,4 @@
 """Access the GridMET database for both single single pixel and gridded queries."""
-# pyright: reportGeneralTypeIssues=false
 from __future__ import annotations
 
 import functools
@@ -127,13 +126,14 @@ def _by_coord(
     clm.columns = clm.columns.str.replace(r'\[unit="(.+)"\]', "", regex=True)
     clm.columns = clm.columns.map(abbrs).map(lambda x: f"{x} ({gridmet.units[x]})")
 
-    clm = clm.set_index(pd.to_datetime(clm.index.strftime("%Y-%m-%d")))
+    clm.index = pd.DatetimeIndex(
+        clm.index.date, name="time"  # pyright: ignore[reportGeneralTypeIssues]
+    )
     clm = clm.where(clm < gridmet.missing_value)
 
     if snow:
         params = {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
         clm = gridmet.separate_snow(clm, **params)
-    clm.index.name = "time"
     return clm
 
 
@@ -231,7 +231,6 @@ def get_bycoords(
         clm_ds = clm_ds.rename(
             {n: re.sub(r"\([^\)]*\)", "", str(n)).strip() for n in clm_ds.data_vars}
         )
-        clm_ds["time"] = pd.DatetimeIndex(pd.to_datetime(clm_ds["time"]).date)
         for v in clm_ds.data_vars:
             clm_ds[v].attrs["units"] = gridmet.units[v]
             clm_ds[v].attrs["long_name"] = gridmet.long_names[v]
@@ -240,12 +239,8 @@ def get_bycoords(
         return clm_ds
 
     if n_pts == 1:
-        clm = next(iter(clm_list), pd.DataFrame())
-    else:
-        clm = pd.concat(clm_list, keys=idx, axis=1)
-        clm = clm.columns.set_names(["id", "variable"])
-    clm = clm.set_index(pd.DatetimeIndex(pd.to_datetime(clm.index).date))
-    return clm
+        return next(iter(clm_list), pd.DataFrame())
+    return pd.concat(clm_list, keys=idx, axis=1, names=["id", "variable"])
 
 
 def _gridded_urls(
@@ -311,6 +306,25 @@ def _match(f: str) -> str:
     if match is None:
         raise ValueError
     return match.group(1)
+
+
+def _check_nans(
+    clm: xr.Dataset,
+    urls: list[str],
+    kwds: list[dict[str, dict[str, str]]],
+    clm_files: list[Path],
+    long2abbr: dict[str, str],
+) -> tuple[bool, list[str], list[dict[str, dict[str, str]]], list[Path]]:
+    """Check for NaNs in the dataset and remove the files containing NaNs."""
+    nans = [p for p, v in clm.isnull().sum().any().items() if v.item()]
+    if nans:
+        nans = [long2abbr[str(n)] for n in nans]
+        urls, kwds, clm_files = zip(
+            *((u, k, f) for u, k, f in zip(urls, kwds, clm_files) if f.name.split("_")[0] in nans)
+        )
+        _ = [f.unlink() for f in clm_files]
+        return True, urls, kwds, clm_files
+    return False, urls, kwds, clm_files
 
 
 def get_bygeom(
@@ -382,7 +396,7 @@ def get_bygeom(
 
     urls, kwds = zip(
         *_gridded_urls(
-            _geometry.bounds,
+            _geometry.bounds,  # pyright: ignore[reportGeneralTypeIssues]
             gridmet.variables,
             dates_itr,
             gridmet.long_names,
@@ -410,18 +424,9 @@ def get_bygeom(
             _ = [f.unlink() for f in clm_files]
             continue
         else:
-            nans = [p for p, v in clm.isnull().sum().any().items() if v.item()]
-            if nans:
+            has_nans, urls, kwds, clm_files = _check_nans(clm, urls, kwds, clm_files, long2abbr)
+            if has_nans:
                 clm = None
-                nans = [long2abbr[n] for n in nans]
-                urls, kwds, clm_files = zip(
-                    *(
-                        (u, k, f)
-                        for u, k, f in zip(urls, kwds, clm_files)
-                        if f.name.split("_")[0] in nans
-                    )
-                )
-                _ = [f.unlink() for f in clm_files]
                 continue
             break
 
