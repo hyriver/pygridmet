@@ -131,6 +131,9 @@ class GridMET:
 
     Parameters
     ----------
+    dates : tuple or int or list, optional
+        Start and end dates as a tuple, (start, end), or a list of years.
+        Defaults to ``2000`` so the class can be initialized without any arguments.
     variables : str or list or tuple, optional
         List of variables to be downloaded. The acceptable variables are:
         ``pr``, ``rmax``, ``rmin``, ``sph``, ``srad``, ``th``, ``tmmn``, ``tmmx``, ``vs``,
@@ -147,6 +150,7 @@ class GridMET:
 
     def __init__(
         self,
+        dates: tuple[str, str] | int | list[int] = 2000,
         variables: Iterable[str] | str | None = None,
         snow: bool = False,
     ) -> None:
@@ -155,10 +159,15 @@ class GridMET:
         validated = GridMETBase(variables=_variables, snow=snow)
         self.variables = validated.variables
         self.snow = validated.snow
-
         self.bounds = (-124.7666, 25.0666, -67.0583, 49.4000)
         self.valid_start = pd.to_datetime("1980-01-01")
         self.valid_end = datetime.now() - pd.DateOffset(days=1)
+
+        self.check_dates(dates)
+        if isinstance(dates, tuple):
+            self.date_iterator = self.dates_tolist(dates)
+        else:
+            self.date_iterator = self.years_tolist(dates)
         self.missing_value = 32767.0
 
         self.gridmet_table = pd.DataFrame(

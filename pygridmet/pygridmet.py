@@ -199,13 +199,7 @@ def get_bycoords(
     >>> clm["pr (mm)"].mean()
     9.677
     """
-    gridmet = GridMET(variables, snow)
-    gridmet.check_dates(dates)
-
-    if isinstance(dates, tuple):
-        dates_itr = gridmet.dates_tolist(dates)
-    else:
-        dates_itr = gridmet.years_tolist(dates)
+    gridmet = GridMET(dates, variables, snow)
 
     lon, lat = _get_lon_lat(coords, coords_id, crs, to_xarray)
     points = Coordinates(lon, lat, gridmet.bounds).points
@@ -216,7 +210,7 @@ def get_bycoords(
     by_coord = functools.partial(
         _by_coord,
         gridmet=gridmet,
-        dates=dates_itr,
+        dates=gridmet.date_iterator,
         snow=snow,
         snow_params=snow_params,
         ssl=ssl,
@@ -248,7 +242,7 @@ def _gridded_urls(
     variables: Iterable[str],
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     long_names: dict[str, str],
-) -> Generator[tuple[str, dict[str, dict[str, str]]], None, None]:
+) -> tuple[list[str], list[dict[str, dict[str, str]]]]:
     """Generate an iterable URL list for downloading GridMET data.
 
     Parameters
@@ -268,27 +262,33 @@ def _gridded_urls(
         An iterator of generated URLs.
     """
     west, south, east, north = bounds
-    return (
-        (
-            f"{ServiceURL().restful.gridmet}/agg_met_{v}_1979_CurrentYear_CONUS.nc#fillmismatch",
-            {
-                "params": {
-                    "var": long_names[v],
-                    "north": f"{north:0.6f}",
-                    "west": f"{west:0.6f}",
-                    "east": f"{east:0.6f}",
-                    "south": f"{south:0.6f}",
-                    "disableProjSubset": "on",
-                    "horizStride": "1",
-                    "time_start": s.strftime(DATE_FMT),
-                    "time_end": e.strftime(DATE_FMT),
-                    "timeStride": "1",
-                    "accept": "netcdf",
-                }
-            },
+    urls, kwds = zip(
+        *(
+            (
+                f"{ServiceURL().restful.gridmet}/agg_met_{v}_1979_CurrentYear_CONUS.nc#fillmismatch",
+                {
+                    "params": {
+                        "var": long_names[v],
+                        "north": f"{north:0.6f}",
+                        "west": f"{west:0.6f}",
+                        "east": f"{east:0.6f}",
+                        "south": f"{south:0.6f}",
+                        "disableProjSubset": "on",
+                        "horizStride": "1",
+                        "time_start": s.strftime(DATE_FMT),
+                        "time_end": e.strftime(DATE_FMT),
+                        "timeStride": "1",
+                        "accept": "netcdf",
+                    }
+                },
+            )
+            for v, (s, e) in itertools.product(variables, dates)
         )
-        for v, (s, e) in itertools.product(variables, dates)
     )
+
+    urls = cast("list[str]", list(urls))
+    kwds = cast("list[dict[str, dict[str, str]]]", list(kwds))
+    return urls, kwds
 
 
 def _open_dataset(f: Path) -> xr.Dataset:
@@ -380,13 +380,7 @@ def get_bygeom(
     >>> clm["tmmn"].mean().item()
     274.167
     """
-    gridmet = GridMET(variables, snow)
-    gridmet.check_dates(dates)
-
-    if isinstance(dates, tuple):
-        dates_itr = gridmet.dates_tolist(dates)
-    else:
-        dates_itr = gridmet.years_tolist(dates)
+    gridmet = GridMET(dates, variables, snow)
 
     crs = ogc.validate_crs(crs)
     _geometry = geoutils.geo2polygon(geometry, crs, 4326)
@@ -394,16 +388,12 @@ def get_bygeom(
     if not _geometry.intersects(shapely.box(*gridmet.bounds)):
         raise InputRangeError("geometry", f"within {gridmet.bounds}")
 
-    urls, kwds = zip(
-        *_gridded_urls(
-            _geometry.bounds,  # pyright: ignore[reportGeneralTypeIssues]
-            gridmet.variables,
-            dates_itr,
-            gridmet.long_names,
-        )
+    urls, kwds = _gridded_urls(
+        _geometry.bounds,  # pyright: ignore[reportGeneralTypeIssues]
+        gridmet.variables,
+        gridmet.date_iterator,
+        gridmet.long_names,
     )
-    urls = cast("list[str]", list(urls))
-    kwds = cast("list[dict[str, dict[str, str]]]", list(kwds))
 
     clm_files = [
         Path("cache", f"{_match(u)}_{ogc.create_request_key('GET', u, **p)}.nc")
@@ -423,12 +413,12 @@ def get_bygeom(
         except ValueError:
             _ = [f.unlink() for f in clm_files]
             continue
-        else:
-            has_nans, urls, kwds, clm_files = _check_nans(clm, urls, kwds, clm_files, long2abbr)
-            if has_nans:
-                clm = None
-                continue
-            break
+
+        has_nans, urls, kwds, clm_files = _check_nans(clm, urls, kwds, clm_files, long2abbr)
+        if has_nans:
+            clm = None
+            continue
+        break
 
     if clm is None:
         msg = " ".join(
