@@ -430,13 +430,12 @@ def get_bygeom(
         raise ServiceError(msg)
 
     clm = xr.where(clm < gridmet.missing_value, clm, np.nan, keep_attrs=True)
-    for v in clm.data_vars:
+    for v in clm:
         clm[v] = clm[v].rio.write_nodata(np.nan)
-    clm = geoutils.xd_write_crs(clm, 4326, "spatial_ref")
-    clm = clm.drop_vars("crs")
+    clm = geoutils.xd_write_crs(clm, 4326, "spatial_ref").drop_vars("crs")
     clm = cast("xr.Dataset", clm)
     clm = geoutils.xarray_geomask(clm, _geometry, 4326)
-    abbrs = {v: k for k, v in gridmet.long_names.items() if v in clm.data_vars}
+    abbrs = {v: k for k, v in gridmet.long_names.items() if v in clm}
     abbrs["day"] = "time"
     clm = clm.rename(abbrs)
     for v in clm.data_vars:
