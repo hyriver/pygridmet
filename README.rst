@@ -137,6 +137,30 @@ Moreover, under the hood, PyGridMET uses
 for making requests in parallel and storing responses in chunks. This improves the
 reliability and speed of data retrieval significantly.
 
+You can control the request/response caching behavior and verbosity of the package
+by setting the following environment variables:
+
+* ``HYRIVER_CACHE_NAME``: Path to the caching SQLite database for asynchronous HTTP
+  requests. It defaults to ``./cache/aiohttp_cache.sqlite``
+* ``HYRIVER_CACHE_NAME_HTTP``: Path to the caching SQLite database for HTTP requests.
+  It defaults to ``./cache/http_cache.sqlite``
+* ``HYRIVER_CACHE_EXPIRE``: Expiration time for cached requests in seconds. It defaults to
+  one week.
+* ``HYRIVER_CACHE_DISABLE``: Disable reading/writing from/to the cache. The default is false.
+* ``HYRIVER_SSL_CERT``: Path to a SSL certificate file.
+
+For example, in your code before making any requests you can do:
+
+.. code-block:: python
+
+    import os
+
+    os.environ["HYRIVER_CACHE_NAME"] = "path/to/aiohttp_cache.sqlite"
+    os.environ["HYRIVER_CACHE_NAME_HTTP"] = "path/to/http_cache.sqlite"
+    os.environ["HYRIVER_CACHE_EXPIRE"] = "3600"
+    os.environ["HYRIVER_CACHE_DISABLE"] = "true"
+    os.environ["HYRIVER_SSL_CERT"] = "path/to/cert.pem"
+
 You can also try using PyGridMET without installing
 it on your system by clicking on the binder badge. A Jupyter Lab
 instance with the HyRiver stack pre-installed will be launched in your web browser, and you
