@@ -19,7 +19,9 @@ try:
     from numba import config as numba_config
     from numba import jit, prange
 
-    ngjit = functools.partial(jit, nopython=True, nogil=True)
+    ngjit = functools.partial(
+        jit, nopython=True, nogil=True
+    )  # pyright: ignore[reportAssignmentType]
     numba_config.THREADING_LAYER = "workqueue"
     has_numba = True
 except ImportError:
@@ -34,7 +36,9 @@ except ImportError:
     ) -> Callable[[Func[T]], Func[T]]:
         def decorator_njit(func: Func[T]) -> Func[T]:
             @functools.wraps(func)
-            def wrapper_decorator(*args: tuple[Any, ...], **kwargs: dict[str, Any]) -> T:
+            def wrapper_decorator(
+                *args: tuple[Any, ...], **kwargs: dict[str, Any]
+            ) -> T:
                 return func(*args, **kwargs)
 
             return wrapper_decorator
@@ -250,7 +254,9 @@ class GridMET:
         self.units = dict(zip(self.gridmet_table["abbr"], self.gridmet_table["units"]))
         self.units["snow"] = "mm"
 
-        self.long_names = dict(zip(self.gridmet_table["abbr"], self.gridmet_table["long_name"]))
+        self.long_names = dict(
+            zip(self.gridmet_table["abbr"], self.gridmet_table["long_name"])
+        )
         self.long_names["snow"] = "snow_amount"
 
     @staticmethod
@@ -264,7 +270,9 @@ class GridMET:
             )
 
         if isinstance(dates, tuple) and len(dates) != 2:
-            raise InputTypeError("dates", "Start and end should be passed as a tuple of length 2.")
+            raise InputTypeError(
+                "dates", "Start and end should be passed as a tuple of length 2."
+            )
 
     def dates_todict(self, dates: tuple[str, str]) -> dict[str, str]:
         """Set dates by start and end dates as a tuple, (start, end)."""
@@ -275,7 +283,9 @@ class GridMET:
         end = pd.to_datetime(dates[1])
 
         if start < self.valid_start or end > self.valid_end:
-            raise InputRangeError("start/end", f"from {self.valid_start} to {self.valid_end}")
+            raise InputRangeError(
+                "start/end", f"from {self.valid_start} to {self.valid_end}"
+            )
 
         return {
             "start": start.strftime(DATE_FMT),
@@ -293,7 +303,9 @@ class GridMET:
 
         return {"years": ",".join(str(y) for y in years)}
 
-    def dates_tolist(self, dates: tuple[str, str]) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
+    def dates_tolist(
+        self, dates: tuple[str, str]
+    ) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
         """Correct dates for GridMET accounting for leap years.
 
         GridMET doesn't account for leap years and removes Dec 31 when
@@ -315,12 +327,16 @@ class GridMET:
 
         period = pd.date_range(start, end)
         nl = period[~period.is_leap_year]
-        lp = period[(period.is_leap_year) & (~period.strftime(DATE_FMT).str.endswith("12-31"))]
+        lp = period[
+            (period.is_leap_year) & (~period.strftime(DATE_FMT).str.endswith("12-31"))
+        ]
         _period = period[(period.isin(nl)) | (period.isin(lp))]
         years = [_period[_period.year == y] for y in _period.year.unique()]
-        return [(y[0], y[-1]) for y in years]
+        return [(y[0], y[-1]) for y in years]  # pyright: ignore[reportReturnType]
 
-    def years_tolist(self, years: list[int] | int) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
+    def years_tolist(
+        self, years: list[int] | int
+    ) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
         """Correct dates for GridMET accounting for leap years.
 
         GridMET doesn't account for leap years and removes Dec 31 when
@@ -341,12 +357,18 @@ class GridMET:
         for year in date_dict["years"].split(","):
             s = pd.to_datetime(f"{year}0101")
             start_list.append(s)
-            e = pd.to_datetime(f"{year}1230") if s.is_leap_year else pd.to_datetime(f"{year}1231")
+            e = (
+                pd.to_datetime(f"{year}1230")
+                if s.is_leap_year
+                else pd.to_datetime(f"{year}1231")
+            )
             end_list.append(e)
         return list(zip(start_list, end_list))
 
     @staticmethod
-    def _snow_point(climate: pd.DataFrame, t_rain: float, t_snow: float) -> pd.DataFrame:
+    def _snow_point(
+        climate: pd.DataFrame, t_rain: float, t_snow: float
+    ) -> pd.DataFrame:
         """Separate snow from precipitation."""
         clm = climate.copy()
         clm["snow (mm)"] = _separate_snow(
@@ -391,7 +413,9 @@ class GridMET:
         clm["snow"].attrs["long_name"] = "daily snowfall"
         return clm
 
-    def separate_snow(self, clm: DF, t_rain: float = T_RAIN, t_snow: float = T_SNOW) -> DF:
+    def separate_snow(
+        self, clm: DF, t_rain: float = T_RAIN, t_snow: float = T_SNOW
+    ) -> DF:
         """Separate snow based on :footcite:t:`Martinez_2010`.
 
         Parameters
@@ -415,7 +439,9 @@ class GridMET:
         """
         if not has_numba:
             warnings.warn(
-                "Numba not installed. Using slow pure python version.", UserWarning, stacklevel=2
+                "Numba not installed. Using slow pure python version.",
+                UserWarning,
+                stacklevel=2,
             )
 
         if not isinstance(clm, (pd.DataFrame, xr.Dataset)):

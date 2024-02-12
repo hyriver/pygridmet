@@ -111,10 +111,15 @@ def _by_coord(
     url_kwds = _coord_urls(coords, gridmet.variables, dates, gridmet.long_names)
     retrieve = functools.partial(ar.retrieve_text, max_workers=MAX_CONN, ssl=ssl)
 
-    clm = pd.concat(
+    clm = pd.concat(  # pyright: ignore[reportCallIssue]
         (
-            pd.concat(
-                pd.read_csv(io.StringIO(r), parse_dates=[0], index_col=[0], usecols=[0, 3])
+            pd.concat(  # pyright: ignore[reportCallIssue]
+                pd.read_csv(  # pyright: ignore[reportCallIssue]
+                    io.StringIO(r),
+                    parse_dates=[0],
+                    index_col=[0],
+                    usecols=[0, 3],  # pyright: ignore[reportArgumentType]
+                )
                 for r in retrieve(u, k)
             )
             for u, k in (zip(*u) for u in url_kwds)
@@ -132,7 +137,9 @@ def _by_coord(
     clm = clm.where(clm < gridmet.missing_value)
 
     if snow:
-        params = {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
+        params = (
+            {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
+        )
         clm = gridmet.separate_snow(clm, **params)
     return clm
 
@@ -220,7 +227,8 @@ def get_bycoords(
     idx = list(coords_id) if coords_id is not None else list(range(n_pts))
     if to_xarray:
         clm_ds = xr.concat(
-            (xr.Dataset.from_dataframe(clm) for clm in clm_list), dim=pd.Index(idx, name="id")
+            (xr.Dataset.from_dataframe(clm) for clm in clm_list),
+            dim=pd.Index(idx, name="id"),
         )
         clm_ds = clm_ds.rename(
             {n: re.sub(r"\([^\)]*\)", "", str(n)).strip() for n in clm_ds.data_vars}
@@ -320,7 +328,11 @@ def _check_nans(
     if nans:
         nans = [long2abbr[str(n)] for n in nans]
         urls, kwds, clm_files = zip(
-            *((u, k, f) for u, k, f in zip(urls, kwds, clm_files) if f.name.split("_")[0] in nans)
+            *(
+                (u, k, f)
+                for u, k, f in zip(urls, kwds, clm_files)
+                if f.name.split("_")[0] in nans
+            )
         )
         _ = [f.unlink() for f in clm_files]
         return True, urls, kwds, clm_files
@@ -414,7 +426,9 @@ def get_bygeom(
             _ = [f.unlink() for f in clm_files]
             continue
 
-        has_nans, urls, kwds, clm_files = _check_nans(clm, urls, kwds, clm_files, long2abbr)
+        has_nans, urls, kwds, clm_files = _check_nans(
+            clm, urls, kwds, clm_files, long2abbr
+        )
         if has_nans:
             clm = None
             continue
@@ -442,6 +456,8 @@ def get_bygeom(
         clm[v].attrs["long_name"] = gridmet.long_names[v]
 
     if snow:
-        params = {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
+        params = (
+            {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
+        )
         clm = gridmet.separate_snow(clm, **params)
     return clm
