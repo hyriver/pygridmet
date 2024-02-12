@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%SZ"
 MAX_CONN = 4
+N_RETRIES = 15
 
 __all__ = ["get_bycoords", "get_bygeom"]
 
@@ -126,14 +127,13 @@ def _by_coord(
         ),
         axis=1,
     )
-    # Rename the columns from their long names to abbreviations and put the units in parentheses
+    # Rename the columns from their long names to abbreviations and
+    # put the units in parentheses
     abbrs = {v: k for k, v in gridmet.long_names.items()}
     clm.columns = clm.columns.str.replace(r'\[unit="(.+)"\]', "", regex=True)
     clm.columns = clm.columns.map(abbrs).map(lambda x: f"{x} ({gridmet.units[x]})")
 
-    clm.index = pd.DatetimeIndex(
-        clm.index.date, name="time"  # pyright: ignore[reportGeneralTypeIssues]
-    )
+    clm.index = pd.DatetimeIndex(clm.index.date, name="time")
     clm = clm.where(clm < gridmet.missing_value)
 
     if snow:
@@ -339,6 +339,47 @@ def _check_nans(
     return False, urls, kwds, clm_files
 
 
+def _download_urls(
+    urls: list[str],
+    kwds: list[dict[str, dict[str, str]]],
+    clm_files: list[Path],
+    ssl: bool,
+    long2abbr: dict[str, str],
+) -> xr.Dataset:
+    """Download the URLs and return the dataset."""
+    clm_files_full = clm_files.copy()
+    clm = None
+    # Sometimes the server returns NaNs, so we must check for that, remove
+    # the files containing NaNs, and try again.
+    for _ in range(N_RETRIES):
+        _ = ogc.streaming_download(urls, kwds, clm_files, ssl=ssl, n_jobs=MAX_CONN)
+        try:
+            # open_mfdataset can run into too many open files error so we use merge
+            # https://docs.xarray.dev/en/stable/user-guide/io.html#reading-multi-file-datasets
+            clm = xr.merge(_open_dataset(f) for f in clm_files_full).astype("f4")
+        except ValueError:
+            _ = [f.unlink() for f in clm_files]
+            continue
+
+        has_nans, urls, kwds, clm_files = _check_nans(
+            clm, urls, kwds, clm_files, long2abbr
+        )
+        if has_nans:
+            clm = None
+            continue
+        break
+
+    if clm is None:
+        msg = " ".join(
+            (
+                "GridMET did NOT process your request successfully.",
+                "Check your inputs and try again.",
+            )
+        )
+        raise ServiceError(msg)
+    return clm
+
+
 def get_bygeom(
     geometry: Polygon | MultiPolygon | tuple[float, float, float, float],
     dates: tuple[str, str] | int | list[int],
@@ -407,43 +448,14 @@ def get_bygeom(
         gridmet.long_names,
     )
 
+    long2abbr = {v: k for k, v in gridmet.long_names.items()}
     clm_files = [
         Path("cache", f"{_match(u)}_{ogc.create_request_key('GET', u, **p)}.nc")
         for u, p in zip(urls, kwds)
     ]
-    clm_files_full = clm_files.copy()
-    long2abbr = {v: k for k, v in gridmet.long_names.items()}
-    clm = None
-    # Sometimes the server returns NaNs, so we must check for that, remove
-    # the files containing NaNs, and try again.
-    for _ in range(15):
-        _ = ogc.streaming_download(urls, kwds, clm_files, ssl=ssl, n_jobs=MAX_CONN)
-        try:
-            # open_mfdataset can run into too many open files error so we use merge
-            # https://docs.xarray.dev/en/stable/user-guide/io.html#reading-multi-file-datasets
-            clm = xr.merge(_open_dataset(f) for f in clm_files_full).astype("f4")
-        except ValueError:
-            _ = [f.unlink() for f in clm_files]
-            continue
-
-        has_nans, urls, kwds, clm_files = _check_nans(
-            clm, urls, kwds, clm_files, long2abbr
-        )
-        if has_nans:
-            clm = None
-            continue
-        break
-
-    if clm is None:
-        msg = " ".join(
-            (
-                "GridMET did NOT process your request successfully.",
-                "Check your inputs and try again.",
-            )
-        )
-        raise ServiceError(msg)
-
+    clm = _download_urls(urls, kwds, clm_files, ssl, long2abbr)
     clm = xr.where(clm < gridmet.missing_value, clm, np.nan, keep_attrs=True)
+
     for v in clm:
         clm[v] = clm[v].rio.write_nodata(np.nan)
     clm = geoutils.xd_write_crs(clm, 4326, "spatial_ref").drop_vars("crs")
