@@ -41,7 +41,13 @@ gh_deps = {
     "pygeoutils": ["async-retriever", "pygeoogc"],
     "pynhd": ["async-retriever", "pygeoogc", "pygeoutils"],
     "py3dep": ["async-retriever", "pygeoogc", "pygeoutils"],
-    "pygeohydro": ["async-retriever", "pygeoogc", "pygeoutils", "pynhd", "hydrosignatures"],
+    "pygeohydro": [
+        "async-retriever",
+        "pygeoogc",
+        "pygeoutils",
+        "pynhd",
+        "hydrosignatures",
+    ],
     "pydaymet": ["async-retriever", "pygeoogc", "pygeoutils", "py3dep"],
     "pygridmet": ["async-retriever", "pygeoogc", "pygeoutils"],
     "pynldas2": ["async-retriever", "pygeoutils"],
@@ -54,7 +60,9 @@ nox.options.sessions = (
 
 
 def install_deps(
-    session: nox.Session, extra: str | None = None, version_limit: list[str] | None = None
+    session: nox.Session,
+    extra: str | None = None,
+    version_limit: list[str] | None = None,
 ) -> None:
     """Install package dependencies."""
     deps = [f".[{extra}]"] if extra else ["."]

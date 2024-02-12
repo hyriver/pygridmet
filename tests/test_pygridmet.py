@@ -14,7 +14,13 @@ import pygridmet as gridmet
 from pygridmet.cli import cli
 
 GEOM = Polygon(
-    [[-69.77, 45.07], [-69.31, 45.07], [-69.31, 45.45], [-69.77, 45.45], [-69.77, 45.07]]
+    [
+        [-69.77, 45.07],
+        [-69.31, 45.07],
+        [-69.31, 45.45],
+        [-69.77, 45.45],
+        [-69.77, 45.07],
+    ]
 )
 DAY = ("2000-01-01", "2000-01-12")
 YEAR = 2010
@@ -37,7 +43,9 @@ class TestByCoords:
 
     def test_daily(self):
         clm = gridmet.get_bycoords(COORDS, DATES, variables=VAR, crs=ALT_CRS)
-        clm_ds = gridmet.get_bycoords(COORDS, DATES, variables=VAR, crs=ALT_CRS, to_xarray=True)
+        clm_ds = gridmet.get_bycoords(
+            COORDS, DATES, variables=VAR, crs=ALT_CRS, to_xarray=True
+        )
 
         expected = 8.8493
         assert_close(clm["pr (mm)"].mean(), expected)
