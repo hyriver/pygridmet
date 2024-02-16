@@ -458,6 +458,7 @@ def get_bygeom(
 
     for v in clm:
         clm[v] = clm[v].rio.write_nodata(np.nan)
+    clm = clm.rio.set_spatial_dims(x_dim="lon", y_dim="lat")
     clm = geoutils.xd_write_crs(clm, 4326, "spatial_ref").drop_vars("crs")
     clm = cast("xr.Dataset", clm)
     clm = geoutils.xarray_geomask(clm, _geometry, 4326)
