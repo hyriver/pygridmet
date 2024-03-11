@@ -1,4 +1,5 @@
 """Command-line interface for PyGridMET."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -116,12 +117,8 @@ def coords(
         raise InputTypeError("file", ".csv")
 
     target_df = get_target_df(pd.read_csv(fpath), ["id", "start", "end", "lon", "lat"])
-    target_df["dates"] = list(
-        target_df[["start", "end"]].itertuples(index=False, name=None)
-    )
-    target_df["coords"] = list(
-        target_df[["lon", "lat"]].itertuples(index=False, name=None)
-    )
+    target_df["dates"] = list(target_df[["start", "end"]].itertuples(index=False, name=None))
+    target_df["coords"] = list(target_df[["lon", "lat"]].itertuples(index=False, name=None))
     if "snow" in target_df:
         target_df = parse_snow(target_df)
 
@@ -142,9 +139,7 @@ def coords(
             if fname.exists():
                 continue
             kwrgs = dict(zip(req_cols[1:], args))
-            clm = gridmet.get_bycoords(
-                **kwrgs, variables=variables, ssl=not disable_ssl
-            )
+            clm = gridmet.get_bycoords(**kwrgs, variables=variables, ssl=not disable_ssl)
             clm.to_csv(fname, index=False)
     click.echo("Done.")
 
@@ -187,9 +182,7 @@ def geometry(
         raise MissingCRSError
 
     target_df = get_target_df(target_df, ["id", "start", "end", "geometry"])
-    target_df["dates"] = list(
-        target_df[["start", "end"]].itertuples(index=False, name=None)
-    )
+    target_df["dates"] = list(target_df[["start", "end"]].itertuples(index=False, name=None))
     req_cols = get_required_cols("geometry", target_df.columns)
     target_df = target_df[req_cols]
 

@@ -1,4 +1,7 @@
 """Tests for PyDaymet package."""
+
+from __future__ import annotations
+
 import io
 import shutil
 from pathlib import Path
@@ -43,9 +46,7 @@ class TestByCoords:
 
     def test_daily(self):
         clm = gridmet.get_bycoords(COORDS, DATES, variables=VAR, crs=ALT_CRS)
-        clm_ds = gridmet.get_bycoords(
-            COORDS, DATES, variables=VAR, crs=ALT_CRS, to_xarray=True
-        )
+        clm_ds = gridmet.get_bycoords(COORDS, DATES, variables=VAR, crs=ALT_CRS, to_xarray=True)
 
         expected = 8.8493
         assert_close(clm["pr (mm)"].mean(), expected)

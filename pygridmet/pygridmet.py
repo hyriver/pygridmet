@@ -1,4 +1,5 @@
 """Access the GridMET database for both single single pixel and gridded queries."""
+
 from __future__ import annotations
 
 import functools
@@ -137,9 +138,7 @@ def _by_coord(
     clm = clm.where(clm < gridmet.missing_value)
 
     if snow:
-        params = (
-            {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
-        )
+        params = {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
         clm = gridmet.separate_snow(clm, **params)
     return clm
 
@@ -328,11 +327,7 @@ def _check_nans(
     if nans:
         nans = [long2abbr[str(n)] for n in nans]
         urls, kwds, clm_files = zip(
-            *(
-                (u, k, f)
-                for u, k, f in zip(urls, kwds, clm_files)
-                if f.name.split("_")[0] in nans
-            )
+            *((u, k, f) for u, k, f in zip(urls, kwds, clm_files) if f.name.split("_")[0] in nans)
         )
         _ = [f.unlink() for f in clm_files]
         return True, urls, kwds, clm_files
@@ -361,9 +356,7 @@ def _download_urls(
             _ = [f.unlink() for f in clm_files]
             continue
 
-        has_nans, urls, kwds, clm_files = _check_nans(
-            clm, urls, kwds, clm_files, long2abbr
-        )
+        has_nans, urls, kwds, clm_files = _check_nans(clm, urls, kwds, clm_files, long2abbr)
         if has_nans:
             clm = None
             continue
@@ -469,8 +462,6 @@ def get_bygeom(
         clm[v].attrs["long_name"] = gridmet.long_names[v]
 
     if snow:
-        params = (
-            {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
-        )
+        params = {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
         clm = gridmet.separate_snow(clm, **params)
     return clm
