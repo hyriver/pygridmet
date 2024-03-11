@@ -7,7 +7,7 @@ repos:
     args: [--config=pyproject.toml]
 
 - repo: https://github.com/bwhmather/ssort
-  rev: v0.12.0
+  rev: 0.12.4
   hooks:
   - id: ssort
     name: Sort top level statements with ssort
@@ -22,12 +22,8 @@ repos:
   rev: v2.1.0
   hooks:
   - id: fixit-fix
-
-- repo: https://github.com/psf/black
-  rev: 23.12.1
-  hooks:
-  - id: black
-    name: Autoformat with black
+    additional_dependencies:
+    - ufmt
 
 - repo: https://github.com/asottile/blacken-docs
   rev: 1.16.0
@@ -37,12 +33,16 @@ repos:
     additional_dependencies: [black]
     args: [-t, py38, -l, '100']
 
-- repo: https://github.com/charliermarsh/ruff-pre-commit
-  rev: v0.1.11
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.3.2
   hooks:
   - id: ruff
     name: Linting with Ruff
-    args: [--fix, --exit-non-zero-on-fix]
+    types_or: [python]
+    args: [--fix]
+  - id: ruff-format
+    name: Formatting with Ruff
+    types_or: [python]
 
 - repo: https://github.com/PyCQA/doc8
   rev: v1.1.1
@@ -60,7 +60,7 @@ repos:
     - tomli
 
 - repo: https://github.com/dosisod/refurb
-  rev: v1.26.0
+  rev: v2.0.0
   hooks:
   - id: refurb
     name: Modernizing Python codebases using Refurb
@@ -68,7 +68,7 @@ repos:
     - numpy
 
 - repo: https://github.com/tox-dev/pyproject-fmt
-  rev: 1.5.3
+  rev: 1.7.0
   hooks:
   - id: pyproject-fmt
     name: Apply a consistent format to pyproject.toml
@@ -106,6 +106,13 @@ repos:
   hooks:
   - id: pretty-format-yaml
     args: [--autofix, --indent, '2']
+
+- repo: https://github.com/rhysd/actionlint
+  rev: v1.6.27
+  hooks:
+  - id: actionlint
+    files: .github/workflows/
+    args: [-ignore, SC1090, -ignore, SC2046, -ignore, SC2086, -ignore, SC2129, -ignore, SC2155]
 
 - repo: local
   hooks:
