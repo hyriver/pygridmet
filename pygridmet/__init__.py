@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+from pygridmet import exceptions
 from pygridmet.core import GridMET
 from pygridmet.exceptions import (
     InputRangeError,
@@ -24,11 +25,12 @@ __all__ = [
     "GridMET",
     "get_bycoords",
     "get_bygeom",
-    "potential_et",
     "show_versions",
     "InputRangeError",
     "InputTypeError",
     "InputValueError",
     "MissingItemError",
     "MissingCRSError",
+    "exceptions",
+    "__version__",
 ]
