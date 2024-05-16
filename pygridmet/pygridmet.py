@@ -347,7 +347,8 @@ def _download_urls(
     # Sometimes the server returns NaNs, so we must check for that, remove
     # the files containing NaNs, and try again.
     for _ in range(N_RETRIES):
-        _ = ogc.streaming_download(urls, kwds, clm_files, ssl=ssl, n_jobs=MAX_CONN)
+        clm_files = ogc.streaming_download(urls, kwds, clm_files, ssl=ssl, n_jobs=MAX_CONN)
+        clm_files = [f for f in clm_files if f is not None]
         try:
             # open_mfdataset can run into too many open files error so we use merge
             # https://docs.xarray.dev/en/stable/user-guide/io.html#reading-multi-file-datasets
