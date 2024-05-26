@@ -8,7 +8,7 @@ import itertools
 import re
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Generator, Iterable, Sequence, Union, cast
+from typing import TYPE_CHECKING, Generator, Iterable, Literal, Sequence, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -38,7 +38,26 @@ __all__ = ["get_bycoords", "get_bygeom"]
 
 def _coord_urls(
     coord: tuple[float, float],
-    variables: Iterable[str],
+    variables: Iterable[
+        Literal[
+            "pr",
+            "rmax",
+            "rmin",
+            "sph",
+            "srad",
+            "th",
+            "tmmn",
+            "tmmx",
+            "vs",
+            "bi",
+            "fm100",
+            "fm1000",
+            "erc",
+            "etr",
+            "pet",
+            "vpd",
+        ]
+    ],
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     long_names: dict[str, str],
 ) -> Generator[list[tuple[str, dict[str, dict[str, str]]]], None, None]:
@@ -148,7 +167,45 @@ def get_bycoords(
     dates: tuple[str, str] | int | list[int],
     coords_id: Sequence[str | int] | None = None,
     crs: CRSTYPE = 4326,
-    variables: Iterable[str] | str | None = None,
+    variables: Iterable[
+        Literal[
+            "pr",
+            "rmax",
+            "rmin",
+            "sph",
+            "srad",
+            "th",
+            "tmmn",
+            "tmmx",
+            "vs",
+            "bi",
+            "fm100",
+            "fm1000",
+            "erc",
+            "etr",
+            "pet",
+            "vpd",
+        ]
+    ]
+    | Literal[
+        "pr",
+        "rmax",
+        "rmin",
+        "sph",
+        "srad",
+        "th",
+        "tmmn",
+        "tmmx",
+        "vs",
+        "bi",
+        "fm100",
+        "fm1000",
+        "erc",
+        "etr",
+        "pet",
+        "vpd",
+    ]
+    | None = None,
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
     ssl: bool = True,
@@ -246,7 +303,26 @@ def get_bycoords(
 
 def _gridded_urls(
     bounds: tuple[float, float, float, float],
-    variables: Iterable[str],
+    variables: Iterable[
+        Literal[
+            "pr",
+            "rmax",
+            "rmin",
+            "sph",
+            "srad",
+            "th",
+            "tmmn",
+            "tmmx",
+            "vs",
+            "bi",
+            "fm100",
+            "fm1000",
+            "erc",
+            "etr",
+            "pet",
+            "vpd",
+        ]
+    ],
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     long_names: dict[str, str],
 ) -> tuple[list[str], list[dict[str, dict[str, str]]]]:
@@ -378,7 +454,45 @@ def get_bygeom(
     geometry: Polygon | MultiPolygon | tuple[float, float, float, float],
     dates: tuple[str, str] | int | list[int],
     crs: CRSTYPE = 4326,
-    variables: Iterable[str] | str | None = None,
+    variables: Iterable[
+        Literal[
+            "pr",
+            "rmax",
+            "rmin",
+            "sph",
+            "srad",
+            "th",
+            "tmmn",
+            "tmmx",
+            "vs",
+            "bi",
+            "fm100",
+            "fm1000",
+            "erc",
+            "etr",
+            "pet",
+            "vpd",
+        ]
+    ]
+    | Literal[
+        "pr",
+        "rmax",
+        "rmin",
+        "sph",
+        "srad",
+        "th",
+        "tmmn",
+        "tmmx",
+        "vs",
+        "bi",
+        "fm100",
+        "fm1000",
+        "erc",
+        "etr",
+        "pet",
+        "vpd",
+    ]
+    | None = None,
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
     ssl: bool = True,
