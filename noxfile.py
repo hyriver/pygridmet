@@ -42,13 +42,7 @@ gh_deps = {
     "pygeoutils": ["async-retriever", "pygeoogc"],
     "pynhd": ["async-retriever", "pygeoogc", "pygeoutils"],
     "py3dep": ["async-retriever", "pygeoogc", "pygeoutils"],
-    "pygeohydro": [
-        "async-retriever",
-        "pygeoogc",
-        "pygeoutils",
-        "pynhd",
-        "hydrosignatures",
-    ],
+    "pygeohydro": ["async-retriever", "pygeoogc", "pygeoutils", "pynhd", "hydrosignatures"],
     "pydaymet": ["async-retriever", "pygeoogc", "pygeoutils", "py3dep"],
     "pygridmet": ["async-retriever", "pygeoogc", "pygeoutils"],
     "pynldas2": ["async-retriever", "pygeoutils"],
@@ -61,9 +55,7 @@ nox.options.sessions = (
 
 
 def install_deps(
-    session: nox.Session,
-    extra: str | None = None,
-    version_limit: list[str] | None = None,
+    session: nox.Session, extra: str | None = None, version_limit: list[str] | None = None
 ) -> None:
     """Install package dependencies."""
     deps = [f".[{extra}]"] if extra else ["."]
@@ -114,7 +106,14 @@ def tests(session: nox.Session) -> None:
         speedup_dep = False
 
     install_deps(session, ",".join(["test", *extras]))
-    session.run("pytest", "--doctest-modules", *session.posargs)
+    session.run(
+        "pytest",
+        "--doctest-modules",
+        f"--cov={package.replace('-', '_')}",
+        "--cov-report",
+        "xml",
+        *session.posargs,
+    )
     session.notify("cover")
     if speedup_dep:
         session.notify("speedup")
@@ -122,6 +121,7 @@ def tests(session: nox.Session) -> None:
 
 @nox.session(python=python_versions)
 def speedup(session: nox.Session) -> None:
+    """Run tests that require speedup deps."""
     extras = get_extras()
     install_deps(session, ",".join(["test", *extras]))
     session.run("pytest", "--doctest-modules", "-m", "speedup", *session.posargs)
