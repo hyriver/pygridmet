@@ -1,8 +1,9 @@
 [build-system]
-build-backend = "setuptools.build_meta"
+build-backend = "hatchling.build"
+
 requires = [
-  "setuptools>=60",
-  "setuptools-scm>=8",
+  "hatch-vcs",
+  "hatchling",
 ]
 
 [project]
@@ -62,26 +63,13 @@ urls.Homepage = "https://docs.hyriver.io/readme/pygridmet.html"
 urls.Issues = "https://github.com/hyriver/pygridmet/issues"
 scripts.pygridmet = "pygridmet.cli:cli"
 
-[tool.setuptools]
-include-package-data = true
-license-files = [
-  "LICENSE",
-]
-platforms = [
-  "any",
-]
-zip-safe = false
+[tool.hatch.version]
+source = "vcs"
 
-[tool.setuptools.package-data]
-pygridmet = [
-  "py.typed",
+[tool.hatch.build.targets.wheel]
+packages = [
+  "src/pygridmet",
 ]
-
-[tool.setuptools.packages]
-find = { namespaces = false }
-
-[tool.setuptools_scm]
-fallback_version = "999"
 
 [tool.ruff]
 target-version = "py38"
@@ -226,7 +214,7 @@ filterwarnings = [
 ]
 testpaths = [
   "tests",
-  "pygridmet",
+  "src/pygridmet",
 ]
 markers = [
   "speedup: Tests that require numba>=0.57",
@@ -247,7 +235,7 @@ omit = [
 ]
 parallel = true
 source = [
-  'pygridmet',
+  'src/pygridmet',
 ]
 
 [tool.pyright]
@@ -258,7 +246,7 @@ exclude = [
   "tests/",
 ]
 include = [
-  "pygridmet",
+  "src/pygridmet",
 ]
 reportMissingTypeStubs = false
 reportUnknownArgumentType = false
