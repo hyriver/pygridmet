@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
 
 import click
 import geopandas as gpd
@@ -19,6 +19,24 @@ from pygridmet.exceptions import (
 
 if TYPE_CHECKING:
     DFType = TypeVar("DFType", pd.DataFrame, gpd.GeoDataFrame)
+    VARS = Literal[
+        "pr",
+        "rmax",
+        "rmin",
+        "sph",
+        "srad",
+        "th",
+        "tmmn",
+        "tmmx",
+        "vs",
+        "bi",
+        "fm100",
+        "fm1000",
+        "erc",
+        "etr",
+        "pet",
+        "vpd",
+    ]
 
 
 def parse_snow(target_df: pd.DataFrame) -> pd.DataFrame:
@@ -90,7 +108,7 @@ def cli() -> None:
 @ssl_opt
 def coords(
     fpath: Path,
-    variables: list[str] | str | None = None,
+    variables: list[VARS] | VARS | None = None,
     save_dir: str | Path = "clm_gridmet",
     disable_ssl: bool = False,
 ) -> None:
@@ -139,7 +157,11 @@ def coords(
             if fname.exists():
                 continue
             kwrgs = dict(zip(req_cols[1:], args))
-            clm = gridmet.get_bycoords(**kwrgs, variables=variables, ssl=not disable_ssl)
+            clm = gridmet.get_bycoords(
+                **kwrgs,
+                variables=variables,
+                ssl=not disable_ssl,
+            )
             clm.to_csv(fname, index=False)
     click.echo("Done.")
 
@@ -151,7 +173,7 @@ def coords(
 @ssl_opt
 def geometry(
     fpath: Path,
-    variables: list[str] | str | None = None,
+    variables: list[VARS] | VARS | None = None,
     save_dir: str | Path = "clm_gridmet",
     disable_ssl: bool = False,
 ) -> None:
