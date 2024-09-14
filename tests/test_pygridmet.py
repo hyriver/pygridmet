@@ -39,7 +39,7 @@ def assert_close(a: float, b: float, rtol: float = 1e-3) -> bool:
 
 
 class TestByCoords:
-    @pytest.mark.speedup()
+    @pytest.mark.speedup
     def test_snow(self):
         clm = gridmet.get_bycoords(COORDS, DATES, snow=True, crs=ALT_CRS)
         assert_close(clm["snow (mm)"].mean(), 0.0)
@@ -54,7 +54,7 @@ class TestByCoords:
 
 
 class TestByGeom:
-    @pytest.mark.speedup()
+    @pytest.mark.speedup
     def test_snow(self):
         clm = gridmet.get_bygeom(GEOM, DAY, snow=True, snow_params={"t_snow": 0.5})
         assert_close(clm.snow.mean().item(), 3.4895)
@@ -102,7 +102,7 @@ class TestCLI:
         assert ret.exit_code == 0
         assert "Found 1 geometry" in ret.output
 
-    @pytest.mark.speedup()
+    @pytest.mark.speedup
     def test_coords(self, runner):
         params = {
             "id": "coords_test",
