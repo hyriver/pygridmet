@@ -36,13 +36,13 @@ dynamic = [
   "version",
 ]
 dependencies = [
-  "async-retriever<0.18,>=0.17",
+  "async-retriever<0.19,>=0.18",
   "click>=0.7",
-  "geopandas>=0.10",
-  "numpy>=1.21",
+  "geopandas>=1",
+  "numpy>=2",
   "pandas>=1",
-  "pygeoogc<0.18,>=0.17",
-  "pygeoutils<0.18,>=0.17",
+  "pygeoogc<0.19,>=0.18",
+  "pygeoutils<0.19,>=0.18",
   "pyproj>=3.0.1",
   "shapely>=2",
   "xarray>=2023.1",
@@ -198,7 +198,7 @@ lint.pydocstyle.convention = "numpy"
 
 [tool.codespell]
 skip = "__pycache__,_build,.mypy_cache,.git,./htmlcov,.nox,**/us_abbrs.py,cache"
-ignore-words-list = "gage,gages,paramss,trough"
+ignore-words-list = "metdata"
 
 [tool.pytest.ini_options]
 addopts = [
