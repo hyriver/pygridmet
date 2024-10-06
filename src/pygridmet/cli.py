@@ -70,8 +70,17 @@ variables_opt = click.option(
     "--variables",
     "-v",
     multiple=True,
-    default=["prcp"],
+    default=["all"],
     help="Target variables. You can pass this flag multiple times for multiple variables.",
+)
+
+years_opt = click.option(
+    "--years",
+    "-y",
+    type=int,
+    multiple=True,
+    required=True,
+    help="Target years. You can pass this flag multiple times for multiple years.",
 )
 
 save_dir_opt = click.option(
@@ -108,7 +117,7 @@ def cli() -> None:
 @ssl_opt
 def coords(
     fpath: Path,
-    variables: list[VARS] | VARS | None = None,
+    variables: list[VARS] | VARS | Literal["all"] = "all",
     save_dir: str | Path = "clm_gridmet",
     disable_ssl: bool = False,
 ) -> None:
@@ -159,7 +168,7 @@ def coords(
             kwrgs = dict(zip(req_cols[1:], args))
             clm = gridmet.get_bycoords(
                 **kwrgs,
-                variables=variables,
+                variables=None if "all" in variables else variables,
                 ssl=not disable_ssl,
             )
             clm.to_csv(fname, index=False)
@@ -173,7 +182,7 @@ def coords(
 @ssl_opt
 def geometry(
     fpath: Path,
-    variables: list[VARS] | VARS | None = None,
+    variables: list[VARS] | VARS | Literal["all"] = "all",
     save_dir: str | Path = "clm_gridmet",
     disable_ssl: bool = False,
 ) -> None:
@@ -225,8 +234,36 @@ def geometry(
             clm = gridmet.get_bygeom(
                 **kwrgs,
                 crs=target_df.crs,
-                variables=variables,
+                variables=None if "all" in variables else variables,
                 ssl=not disable_ssl,
             )
             clm.to_netcdf(fname)
+    click.echo("Done.")
+
+
+@cli.command("conus", context_settings=CONTEXT_SETTINGS)
+@years_opt
+@variables_opt
+@save_dir_opt
+@ssl_opt
+def conus(
+    years: int | list[int],
+    variables: list[VARS] | VARS | Literal["all"] = "all",
+    save_dir: str | Path = "clm_gridmet",
+    disable_ssl: bool = False,
+) -> None:
+    r"""Retrieve climate data for the contiguous United States.
+
+    \b
+    Examples:
+        $ pygridmet conus -y 2010 -v tmmn
+    """
+    n_years = f"{len(years)} years" if len(years) > 1 else "1 year"
+    n_vars = f"{len(variables)} variables" if len(variables) > 1 else "1 variable"
+    click.echo(f"Getting CONUS data for {n_years} and {n_vars} ...")
+    gridmet.get_conus(
+        years,
+        variables=None if "all" in variables else variables,
+        save_dir=save_dir,
+    )
     click.echo("Done.")

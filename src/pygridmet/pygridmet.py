@@ -8,7 +8,7 @@ import itertools
 import re
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Generator, Iterable, Literal, Sequence, Union, cast
+from typing import TYPE_CHECKING, Literal, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -18,12 +18,15 @@ import xarray as xr
 import async_retriever as ar
 import pygeoogc as ogc
 import pygeoutils as geoutils
-from pygeoogc import ServiceError, ServiceURL
+from pygeoogc import ServiceURL
+from pygeoogc.exceptions import ServiceError
 from pygeoutils import Coordinates
-from pygridmet.core import T_RAIN, T_SNOW, GridMET
+from pygridmet.core import GM_VARS, T_RAIN, T_SNOW, GridMET
 from pygridmet.exceptions import InputRangeError, InputTypeError
 
 if TYPE_CHECKING:
+    from collections.abc import Generator, Iterable, Sequence
+
     import pyproj
     from shapely import MultiPolygon, Polygon
 
@@ -51,7 +54,7 @@ DATE_FMT = "%Y-%m-%dT%H:%M:%SZ"
 MAX_CONN = 4
 N_RETRIES = 15
 
-__all__ = ["get_bycoords", "get_bygeom"]
+__all__ = ["get_bycoords", "get_bygeom", "get_conus"]
 
 
 def _coord_urls(
@@ -491,3 +494,42 @@ def get_bygeom(
         params = {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
         clm = gridmet.separate_snow(clm, **params)
     return clm
+
+
+def get_conus(
+    years: int | list[int],
+    variables: VARS | list[VARS] | None = None,
+    save_dir: str | Path = "clm_gridmet",
+) -> list[Path | None]:
+    """Get the entire CONUS data for the specified years and variables.
+
+    Parameters
+    ----------
+    years : int or list
+        The year(s) of interest.
+    variables : str or list, optional
+        The variable(s) of interest, defaults to ``None`` which downloads
+        all the variables.
+    save_dir : str or Path, optional
+        The directory to store the downloaded data, defaults to ``./clm_gridmet``.
+        The files are stored in the NetCDF format and the file names are based
+        on the variable names and the years, e.g., ``tmmn_2010.nc``.
+
+    Returns
+    -------
+    list
+        A list of the downloaded files.
+
+    Examples
+    --------
+    >>> import pygridmet as gridmet
+    >>> filenames = gridmet.get_conus(2010, "tmmn")
+    """
+    yr_list = [years] if isinstance(years, int) else years
+    var_list = [variables] if isinstance(variables, str) else variables
+    if any(v not in GM_VARS for v in var_list):
+        raise InputTypeError("variables", f"one of {GridMET.variables}")
+    base_url = "https://www.northwestknowledge.net/metdata/data/{}_{}.nc"
+    urls = [base_url.format(v, yr) for v in var_list for yr in yr_list]
+    fnames = [Path(save_dir, url.split("/")[-1]) for url in urls]
+    return ogc.streaming_download(urls, fnames=fnames, n_jobs=MAX_CONN)
