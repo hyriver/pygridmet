@@ -145,6 +145,19 @@ class TestCLI:
         assert "Found coordinates of 1 point" in ret.output
 
 
+def test_conus(runner):
+    fnames = gridmet.get_conus(2010, variables="tmmn")
+    assert fnames[0].exists()
+
+    save_dir = "test_conus"
+    ret = runner.invoke(cli, ["conus", "-y", 2010, "-v", "tmmn", "-s", save_dir])
+    assert Path(save_dir, "tmmn_2010.nc").exists()
+    shutil.rmtree(save_dir, ignore_errors=True)
+    assert str(ret.exception) == "None"
+    assert ret.exit_code == 0
+    assert "Getting CONUS data for 1 year and 1 variable" in ret.output
+
+
 def test_show_versions():
     f = io.StringIO()
     gridmet.show_versions(file=f)

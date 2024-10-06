@@ -9,14 +9,14 @@ import pytest
 from shapely import Polygon
 
 import pygridmet as gridmet
-from pygridmet import (
+from pygridmet.cli import cli
+from pygridmet.exceptions import (
     InputRangeError,
     InputTypeError,
     InputValueError,
     MissingCRSError,
     MissingItemError,
 )
-from pygridmet.cli import cli
 
 GEOM = Polygon(
     [
