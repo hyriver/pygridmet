@@ -7,7 +7,7 @@ import functools
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Iterable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -30,9 +30,7 @@ except ImportError:
     T = TypeVar("T")
     Func = Callable[..., T]
 
-    def ngjit(
-        signature_or_function: str | Func[T], parallel: bool = False
-    ) -> Callable[[Func[T]], Func[T]]:
+    def ngjit(*args: Any, **kwargs: Any) -> Callable[[Func[T]], Func[T]]:
         def decorator_njit(func: Func[T]) -> Func[T]:
             @functools.wraps(func)
             def wrapper_decorator(*args: tuple[Any, ...], **kwargs: dict[str, Any]) -> T:
@@ -44,13 +42,32 @@ except ImportError:
 
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     DF = TypeVar("DF", pd.DataFrame, xr.Dataset)
 
 DATE_FMT = "%Y-%m-%d"
 # Default snow params from https://doi.org/10.5194/gmd-11-1077-2018
 T_RAIN = 2.5  # degC
 T_SNOW = 0.6  # degC
-
+GM_VARS = (
+    "pr",
+    "rmax",
+    "rmin",
+    "sph",
+    "srad",
+    "th",
+    "tmmn",
+    "tmmx",
+    "vs",
+    "bi",
+    "fm100",
+    "fm1000",
+    "erc",
+    "etr",
+    "pet",
+    "vpd",
+)
 __all__ = ["GridMET"]
 
 
@@ -78,29 +95,11 @@ class GridMETBase:
     variables: Iterable[str]
 
     def __post_init__(self) -> None:
-        valid_variables = (
-            "pr",
-            "rmax",
-            "rmin",
-            "sph",
-            "srad",
-            "th",
-            "tmmn",
-            "tmmx",
-            "vs",
-            "bi",
-            "fm100",
-            "fm1000",
-            "erc",
-            "etr",
-            "pet",
-            "vpd",
-        )
         if "all" in self.variables:
-            self.variables = valid_variables
+            self.variables = GM_VARS
 
-        if not set(self.variables).issubset(set(valid_variables)):
-            raise InputValueError("variables", valid_variables)
+        if not set(self.variables).issubset(set(GM_VARS)):
+            raise InputValueError("variables", GM_VARS)
 
         if self.snow:
             self.variables = list(set(self.variables).union({"tmmn"}))
