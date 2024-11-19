@@ -16,10 +16,10 @@ except PackageNotFoundError:
 
 __all__ = [
     "GridMET",
+    "__version__",
+    "exceptions",
     "get_bycoords",
     "get_bygeom",
     "get_conus",
     "show_versions",
-    "exceptions",
-    "__version__",
 ]
