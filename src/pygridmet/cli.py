@@ -96,12 +96,6 @@ save_dir_opt = click.option(
     ),
 )
 
-ssl_opt = click.option(
-    "--disable_ssl",
-    is_flag=True,
-    help="Pass to disable SSL certification verification.",
-)
-
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 
@@ -114,12 +108,10 @@ def cli() -> None:
 @click.argument("fpath", type=click.Path(exists=True))
 @variables_opt
 @save_dir_opt
-@ssl_opt
 def coords(
     fpath: Path,
     variables: list[VARS] | VARS | Literal["all"] = "all",
     save_dir: str | Path = "clm_gridmet",
-    disable_ssl: bool = False,
 ) -> None:
     """Retrieve climate data for a list of coordinates.
 
@@ -169,7 +161,6 @@ def coords(
             clm = gridmet.get_bycoords(
                 **kwrgs,
                 variables=None if "all" in variables else variables,
-                ssl=not disable_ssl,
             )
             clm.to_csv(fname, index=False)
     click.echo("Done.")
@@ -179,12 +170,10 @@ def coords(
 @click.argument("fpath", type=click.Path(exists=True))
 @variables_opt
 @save_dir_opt
-@ssl_opt
 def geometry(
     fpath: Path,
     variables: list[VARS] | VARS | Literal["all"] = "all",
     save_dir: str | Path = "clm_gridmet",
-    disable_ssl: bool = False,
 ) -> None:
     """Retrieve climate data for a dataframe of geometries.
 
@@ -235,7 +224,6 @@ def geometry(
                 **kwrgs,
                 crs=target_df.crs,
                 variables=None if "all" in variables else variables,
-                ssl=not disable_ssl,
             )
             clm.to_netcdf(fname)
     click.echo("Done.")
@@ -245,12 +233,10 @@ def geometry(
 @years_opt
 @variables_opt
 @save_dir_opt
-@ssl_opt
 def conus(
     years: int | list[int],
     variables: list[VARS] | VARS | Literal["all"] = "all",
     save_dir: str | Path = "clm_gridmet",
-    disable_ssl: bool = False,
 ) -> None:
     r"""Retrieve climate data for the contiguous United States.
 

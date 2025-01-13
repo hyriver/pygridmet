@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import os
-from collections.abc import Iterable, Sequence
+import re
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING
-from urllib.parse import urlparse
+from typing import TYPE_CHECKING, Literal
+from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 import pyproj
@@ -38,9 +39,7 @@ __all__ = [
     "transform_coords",
     "validate_coords",
     "validate_crs",
-    "write_crs",
 ]
-CHUNK_SIZE = 1048576  # 1 MB
 TransformerFromCRS = lru_cache(Transformer.from_crs)
 
 
@@ -64,11 +63,11 @@ def validate_crs(crs: CRSTYPE) -> str:
 
 
 def transform_coords(
-    coords: Sequence[tuple[float, float]], in_crs: CRSTYPE, out_crs: CRSTYPE
+    coords: Iterable[tuple[float, float]], in_crs: CRSTYPE, out_crs: CRSTYPE
 ) -> list[tuple[float, float]]:
     """Transform coordinates from one CRS to another."""
     try:
-        pts = shapely.points(coords)
+        pts = shapely.points(np.atleast_2d(coords))
     except (TypeError, AttributeError, ValueError) as ex:
         raise InputTypeError("coords", "a list of tuples") from ex
     x, y = shapely.get_coordinates(pts).T
@@ -87,11 +86,11 @@ def validate_coords(
 ) -> NDArray[np.float64]:
     """Validate coordinates within a bounding box."""
     try:
-        pts = shapely.points(list(coords))
+        pts = shapely.points(np.atleast_2d(coords))
     except (TypeError, AttributeError, ValueError) as ex:
         raise InputTypeError("coords", "a list of tuples") from ex
     if shapely.contains(shapely.box(*bounds), pts).all():
-        return shapely.get_coordinates(pts)
+        return shapely.get_coordinates(pts).round(6)
     raise InputRangeError("coords", f"within {bounds}")
 
 
@@ -131,10 +130,13 @@ def to_geometry(
     raise InputTypeError("geo_crs/crs", "either both None or both valid CRS")
 
 
-def _download(url: str, fname: Path, http: urllib3.HTTPConnectionPool) -> None:
+def _download(
+    url: str, fname: Path, http: urllib3.HTTPConnectionPool | urllib3.HTTPSConnectionPool
+) -> None:
     """Download a file from a URL."""
     parsed_url = urlparse(url)
-    path = f"{parsed_url.path}?{parsed_url.query}"
+    query = parsed_url.query
+    path = f"{parsed_url.path}?{parsed_url.query}" if query else parsed_url.path
     head = http.request("HEAD", path)
     fsize = int(head.headers.get("Content-Length", -1))
     if fname.exists() and fname.stat().st_size == fsize:
@@ -143,32 +145,75 @@ def _download(url: str, fname: Path, http: urllib3.HTTPConnectionPool) -> None:
     fname.write_bytes(http.request("GET", path).data)
 
 
-def download_files(url_list: list[str], file_extension: str, save_dir: Path | None = None, rewrite: bool = False) -> list[Path]:
+def find_var(url: str) -> str:
+    """Match the variable name in a URL."""
+    pattern = r"agg_met_(.*?)_1979_"
+    match = re.search(pattern, url.split("?")[0])
+    if match is None:
+        raise ValueError
+    return match.group(1)
+
+
+def _get_prefix(url: str) -> str:
+    """Get the file prefix for creating a unique filename from a URL."""
+    var = find_var(url)
+    query = urlparse(url).query
+    lat = parse_qs(query).get("latitude", ["grid"])[0]
+    lon = parse_qs(query).get("longitude", ["grid"])[0]
+    return f"{lon}_{lat}_{var}"
+
+
+def download_files(
+    url_list: list[str],
+    f_ext: Literal["csv", "nc"],
+    file_names: list[Path] | None = None,
+    rewrite: bool = False,
+) -> list[Path]:
     """Download multiple files concurrently."""
-    if save_dir is None:
+    if file_names is None:
         hr_cache = os.getenv("HYRIVER_CACHE_NAME")
         save_dir = Path(hr_cache).parent if hr_cache else Path("cache")
+    else:
+        save_dir = Path(file_names[0]).parent
     save_dir.mkdir(exist_ok=True, parents=True)
 
-    http = urllib3.HTTPConnectionPool(
-        urlparse(url_list[0]).netloc,
-        maxsize=10,
-        block=True,
-        retries=urllib3.Retry(
-            total=5,
-            backoff_factor=0.5,
-            status_forcelist=[500, 502, 504],
-            allowed_methods=["HEAD", "GET"],
-        ),
-    )
+    if file_names is None:
+        file_list = [
+            Path(save_dir, f"{_get_prefix(url)}_{hashlib.sha256(url.encode()).hexdigest()}.{f_ext}")
+            for url in url_list
+        ]
+    else:
+        file_list = file_names
 
-    file_list = [
-        Path(save_dir, f"{hashlib.sha256(url.encode()).hexdigest()}.{file_extension}")
-        for url in url_list
-    ]
     if rewrite:
         _ = [f.unlink(missing_ok=True) for f in file_list]
+
     max_workers = min(4, os.cpu_count() or 1, len(url_list))
+    paserd_url = urlparse(url_list[0])
+    if paserd_url.scheme == "https":
+        http = urllib3.HTTPSConnectionPool(
+            paserd_url.netloc,
+            maxsize=10,
+            block=True,
+            retries=urllib3.Retry(
+                total=5,
+                backoff_factor=0.5,
+                status_forcelist=[500, 502, 504],
+                allowed_methods=["HEAD", "GET"],
+            ),
+        )
+    else:
+        http = urllib3.HTTPConnectionPool(
+            paserd_url.netloc,
+            maxsize=10,
+            block=True,
+            retries=urllib3.Retry(
+                total=5,
+                backoff_factor=0.5,
+                status_forcelist=[500, 502, 504],
+                allowed_methods=["HEAD", "GET"],
+            ),
+        )
     if max_workers == 1:
         _ = [_download(url, path, http) for url, path in zip(url_list, file_list)]
         return file_list

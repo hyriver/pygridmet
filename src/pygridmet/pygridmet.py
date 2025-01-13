@@ -2,30 +2,24 @@
 
 from __future__ import annotations
 
-import functools
-import io
 import itertools
 import re
 import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Union, cast
+from urllib.parse import urlencode
 
 import numpy as np
 import pandas as pd
 import shapely
 import xarray as xr
 
-import async_retriever as ar
-import pygeoogc as ogc
-import pygeoutils as geoutils
-from pygeoogc import ServiceURL
-from pygeoogc.exceptions import ServiceError
-from pygeoutils import Coordinates
+import pygridmet._utils as utils
 from pygridmet.core import GM_VARS, T_RAIN, T_SNOW, GridMET
-from pygridmet.exceptions import InputRangeError, InputTypeError
+from pygridmet.exceptions import InputRangeError, InputTypeError, ServiceError
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable, Sequence
+    from collections.abc import Iterable, Sequence
 
     import pyproj
     from shapely import MultiPolygon, Polygon
@@ -53,99 +47,63 @@ if TYPE_CHECKING:
 DATE_FMT = "%Y-%m-%dT%H:%M:%SZ"
 MAX_CONN = 4
 N_RETRIES = 15
+URL = "http://thredds.northwestknowledge.net:8080/thredds/ncss"
 
 __all__ = ["get_bycoords", "get_bygeom", "get_conus"]
 
 
 def _coord_urls(
-    coord: tuple[float, float],
+    coords_list: Iterable[tuple[float, float]],
     variables: Iterable[VARS],
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     long_names: dict[str, str],
-) -> Generator[list[tuple[str, dict[str, dict[str, str]]]], None, None]:
-    """Generate an iterable URL list for downloading GridMET data.
-
-    Parameters
-    ----------
-    coord : tuple of length 2
-        Coordinates in EPSG:4326 CRS (lon, lat)
-    variables : list
-        A list of GridMET variables
-    dates : list
-        A list of dates
-    long_names : dict
-        A dictionary of long names for the variables.
-
-    Returns
-    -------
-    generator
-        An iterator of generated URLs.
-    """
-    lon, lat = coord
-    return (
-        [
-            (
-                f"{ServiceURL().restful.gridmet}/agg_met_{v}_1979_CurrentYear_CONUS.nc#fillmismatch",
-                {
-                    "params": {
-                        "var": long_names[v],
-                        "longitude": f"{lon:0.6f}",
-                        "latitude": f"{lat:0.6f}",
-                        "time_start": s.strftime(DATE_FMT),
-                        "time_end": e.strftime(DATE_FMT),
-                        "accept": "csv",
-                    }
-                },
-            )
-            for s, e in dates
-        ]
-        for v in variables
-    )
+) -> list[str]:
+    """Generate an iterable URL list for downloading GridMET data."""
+    return [
+        f"{URL}/agg_met_{v}_1979_CurrentYear_CONUS.nc?"
+        + urlencode(
+            {
+                "var": long_names[v],
+                "longitude": f"{lon:0.6f}",
+                "latitude": f"{lat:0.6f}",
+                "time_start": s.strftime(DATE_FMT),
+                "time_end": e.strftime(DATE_FMT),
+                "accept": "csv",
+            }
+        )
+        for lon, lat in coords_list
+        for v, (s, e) in itertools.product(variables, dates)
+    ]
 
 
 def _get_lon_lat(
     coords: list[tuple[float, float]] | tuple[float, float],
-    coords_id: Sequence[str | int] | None = None,
-    crs: CRSTYPE = 4326,
-    to_xarray: bool = False,
+    bounds: tuple[float, float, float, float],
+    coords_id: Sequence[str | int] | None,
+    crs: CRSTYPE,
+    to_xarray: bool,
 ) -> tuple[list[float], list[float]]:
     """Get longitude and latitude from a list of coordinates."""
-    coords_list = geoutils.coords_list(coords)
+    coords_list = utils.transform_coords(coords, crs, 4326)
 
     if to_xarray and coords_id is not None and len(coords_id) != len(coords_list):
         raise InputTypeError("coords_id", "list with the same length as of coords")
 
-    coords_list = ogc.match_crs(coords_list, crs, 4326)
-    lon, lat = zip(*coords_list)
-    return list(lon), list(lat)
+    lon, lat = utils.validate_coords(coords_list, bounds).T
+    return lon.tolist(), lat.tolist()
 
 
 def _by_coord(
-    lon: float,
-    lat: float,
+    csv_files: dict[str, list[Path]],
     gridmet: GridMET,
-    dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     snow: bool,
     snow_params: dict[str, float] | None,
-    ssl: bool,
 ) -> pd.DataFrame:
     """Get climate data for a coordinate and return as a DataFrame."""
-    coords = (lon, lat)
-    url_kwds = _coord_urls(coords, gridmet.variables, dates, gridmet.long_names)  # pyright: ignore[reportArgumentType]
-    retrieve = functools.partial(ar.retrieve_text, max_workers=MAX_CONN, ssl=ssl)
-
-    clm = pd.concat(  # pyright: ignore[reportCallIssue]
+    clm = pd.concat(
         (
-            pd.concat(  # pyright: ignore[reportCallIssue]
-                pd.read_csv(  # pyright: ignore[reportCallIssue]
-                    io.StringIO(r),
-                    parse_dates=[0],
-                    index_col=[0],
-                    usecols=[0, 3],  # pyright: ignore[reportArgumentType]
-                )
-                for r in retrieve(u, k)
-            )
-            for u, k in (zip(*u) for u in url_kwds)
+            pd.concat(pd.read_csv(f, parse_dates=[0], usecols=[0, 3], index_col=[0]) for f in files)
+            for _, files in csv_files.items()
         ),
         axis=1,
     )
@@ -172,7 +130,6 @@ def get_bycoords(
     variables: Iterable[VARS] | VARS | None = None,
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
-    ssl: bool = True,
     to_xarray: bool = False,
 ) -> pd.DataFrame | xr.Dataset:
     """Get point-data from the GridMET database at 1-km resolution.
@@ -203,8 +160,6 @@ def get_bycoords(
         ``t_snow`` (deg C) which is the threshold for temperature for considering snow.
         The default values are ``{'t_rain': 2.5, 't_snow': 0.6}`` that are adopted from
         https://doi.org/10.5194/gmd-11-1077-2018.
-    ssl : bool, optional
-        Whether to verify SSL certification, defaults to ``True``.
     to_xarray : bool, optional
         Return the data as an ``xarray.Dataset``. Defaults to ``False``.
 
@@ -228,27 +183,32 @@ def get_bycoords(
     """
     gridmet = GridMET(dates, variables, snow)
 
-    lon, lat = _get_lon_lat(coords, coords_id, crs, to_xarray)
-    points = Coordinates(lon, lat, gridmet.bounds).points
-    n_pts = len(points)
-    if n_pts == 0 or n_pts != len(lon):
-        raise InputRangeError("coords", f"within {gridmet.bounds}")
+    lon, lat = _get_lon_lat(coords, gridmet.bounds, coords_id, crs, to_xarray)
+    n_pts = len(lon)
 
-    by_coord = functools.partial(
-        _by_coord,
-        gridmet=gridmet,
-        dates=gridmet.date_iterator,
-        snow=snow,
-        snow_params=snow_params,
-        ssl=ssl,
-    )
-    clm_list = itertools.starmap(by_coord, zip(points.x, points.y))
+    urls = _coord_urls(zip(lon, lat), gridmet.variables, gridmet.date_iterator, gridmet.long_names)
+    # group based on lon, lat, and variable, i.e, dict of dict of list
+    grouped_files = {}
+    for file in utils.download_files(urls, "csv"):
+        x, y, v = file.name.split("_")[:3]
+        x, y = float(x), float(y)
+        if (x, y) not in grouped_files:
+            grouped_files[(x, y)] = {}
+        if v not in grouped_files[(x, y)]:
+            grouped_files[(x, y)][v] = []
+
+        grouped_files[(x, y)][v].append(file)
 
     idx = list(coords_id) if coords_id is not None else list(range(n_pts))
+    idx = dict(zip(zip(lon, lat), idx))
+    clm_list = {
+        idx[c]: _by_coord(files, gridmet, snow, snow_params) for c, files in grouped_files.items()
+    }
+
     if to_xarray:
         clm_ds = xr.concat(
-            (xr.Dataset.from_dataframe(clm) for clm in clm_list),
-            dim=pd.Index(idx, name="id"),
+            (xr.Dataset.from_dataframe(clm) for clm in clm_list.values()),
+            dim=pd.Index(list(clm_list), name="id"),
         )
         clm_ds = clm_ds.rename(
             {n: re.sub(r"\([^\)]*\)", "", str(n)).strip() for n in clm_ds.data_vars}
@@ -256,13 +216,13 @@ def get_bycoords(
         for v in clm_ds.data_vars:
             clm_ds[v].attrs["units"] = gridmet.units[v]
             clm_ds[v].attrs["long_name"] = gridmet.long_names[v]
-        clm_ds["lat"] = (("id",), points.y)
-        clm_ds["lon"] = (("id",), points.x)
+        clm_ds["lat"] = (("id",), lat)
+        clm_ds["lon"] = (("id",), lon)
         return clm_ds
 
     if n_pts == 1:
-        return next(iter(clm_list), pd.DataFrame())
-    return pd.concat(clm_list, keys=idx, axis=1, names=["id", "variable"])
+        return next(iter(clm_list.values()), pd.DataFrame())
+    return pd.concat(clm_list.values(), keys=list(clm_list), axis=1, names=["id", "variable"])
 
 
 def _gridded_urls(
@@ -270,7 +230,7 @@ def _gridded_urls(
     variables: Iterable[VARS],
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     long_names: dict[str, str],
-) -> tuple[list[str], list[dict[str, dict[str, str]]]]:
+) -> list[str]:
     """Generate an iterable URL list for downloading GridMET data.
 
     Parameters
@@ -286,37 +246,30 @@ def _gridded_urls(
 
     Returns
     -------
-    generator
-        An iterator of generated URLs.
+    list
+        A list of generated URLs.
     """
     west, south, east, north = bounds
-    urls, kwds = zip(
-        *(
-            (
-                f"{ServiceURL().restful.gridmet}/agg_met_{v}_1979_CurrentYear_CONUS.nc#fillmismatch",
-                {
-                    "params": {
-                        "var": long_names[v],
-                        "north": f"{north:0.6f}",
-                        "west": f"{west:0.6f}",
-                        "east": f"{east:0.6f}",
-                        "south": f"{south:0.6f}",
-                        "disableProjSubset": "on",
-                        "horizStride": "1",
-                        "time_start": s.strftime(DATE_FMT),
-                        "time_end": e.strftime(DATE_FMT),
-                        "timeStride": "1",
-                        "accept": "netcdf",
-                    }
-                },
-            )
-            for v, (s, e) in itertools.product(variables, dates)
+    return [
+        f"{URL}/agg_met_{v}_1979_CurrentYear_CONUS.nc?"
+        + urlencode(
+            {
+                "var": long_names[v],
+                "north": f"{north:0.6f}",
+                "west": f"{west:0.6f}",
+                "east": f"{east:0.6f}",
+                "south": f"{south:0.6f}",
+                "disableProjSubset": "on",
+                "horizStride": "1",
+                "time_start": s.strftime(DATE_FMT),
+                "time_end": e.strftime(DATE_FMT),
+                "timeStride": "1",
+                "addLatLon": "true",
+                "accept": "netcdf",
+            }
         )
-    )
-
-    urls = cast("list[str]", list(urls))
-    kwds = cast("list[dict[str, dict[str, str]]]", list(kwds))
-    return urls, kwds
+        for v, (s, e) in itertools.product(variables, dates)
+    ]
 
 
 def _open_dataset(f: Path) -> xr.Dataset:
@@ -327,66 +280,48 @@ def _open_dataset(f: Path) -> xr.Dataset:
             return ds.load()
 
 
-def _match(f: str) -> str:
-    """Match the variable name in the file name."""
-    pattern = r"met_(.*?)_1979"
-    match = re.search(pattern, f)
-    if match is None:
-        raise ValueError
-    return match.group(1)
-
-
 def _check_nans(
     clm: xr.Dataset,
     urls: list[str],
-    kwds: list[dict[str, dict[str, str]]],
     clm_files: list[Path],
     long2abbr: dict[str, str],
-) -> tuple[bool, list[str], list[dict[str, dict[str, str]]], list[Path]]:
-    """Check for NaNs in the dataset and remove the files containing NaNs."""
+) -> tuple[bool, list[str]]:
+    """Check for NaNs, remove files containing NaNs, and return URLs with NaN results."""
     nans = [p for p, v in clm.isnull().sum().any().items() if v.item()]
     if nans:
         nans = [long2abbr[str(n)] for n in nans]
-        urls, kwds, clm_files = zip(
-            *((u, k, f) for u, k, f in zip(urls, kwds, clm_files) if f.name.split("_")[0] in nans)
+        urls, clm_files = zip(
+            *((u, f) for u, f in zip(urls, clm_files) if utils.find_var(u) in nans)
         )
         _ = [f.unlink() for f in clm_files]
-        return True, urls, kwds, clm_files
-    return False, urls, kwds, clm_files
+        return True, urls
+    return False, urls
 
 
 def _download_urls(
     urls: list[str],
-    kwds: list[dict[str, dict[str, str]]],
-    clm_files: Sequence[Path],
-    ssl: bool,
     long2abbr: dict[str, str],
 ) -> xr.Dataset:
     """Download the URLs and return the dataset."""
-    clm_files_full = list(clm_files)
-    clm_files_ = clm_files_full.copy()
+    clm_all_files = utils.download_files(urls, "nc")
+    clm_files = clm_all_files.copy()
     clm = None
     # Sometimes the server returns NaNs, so we must check for that, remove
     # the files containing NaNs, and try again.
     for _ in range(N_RETRIES):
-        clm_files_ = ogc.streaming_download(
-            urls,
-            kwds,
-            clm_files_,
-            ssl=ssl,
-            n_jobs=MAX_CONN,
-        )
-        clm_files_ = [f for f in clm_files_ if f is not None]
         try:
             # open_mfdataset can run into too many open files error so we use merge
             # https://docs.xarray.dev/en/stable/user-guide/io.html#reading-multi-file-datasets
-            clm = xr.merge(_open_dataset(f) for f in clm_files_full).astype("f4")
+            clm = xr.merge(_open_dataset(f) for f in clm_all_files).astype("f4")
         except ValueError:
-            _ = [f.unlink() for f in clm_files_]
+            _ = [f.unlink() for f in clm_files]
+            clm_files = utils.download_files(urls, "nc")
+            clm = None
             continue
 
-        has_nans, urls, kwds, clm_files_ = _check_nans(clm, urls, kwds, clm_files_, long2abbr)
+        has_nans, urls = _check_nans(clm, urls, clm_files, long2abbr)
         if has_nans:
+            clm_files = utils.download_files(urls, "nc")
             clm = None
             continue
         break
@@ -409,7 +344,6 @@ def get_bygeom(
     variables: Iterable[VARS] | VARS | None = None,
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
-    ssl: bool = True,
 ) -> xr.Dataset:
     """Get gridded data from the GridMET database at 1-km resolution.
 
@@ -436,8 +370,6 @@ def get_bygeom(
         ``t_snow`` (deg C) which is the threshold for temperature for considering snow.
         The default values are ``{'t_rain': 2.5, 't_snow': 0.6}`` that are adopted from
         https://doi.org/10.5194/gmd-11-1077-2018.
-    ssl : bool, optional
-        Whether to verify SSL certification, defaults to ``True``.
 
     Returns
     -------
@@ -457,13 +389,12 @@ def get_bygeom(
     """
     gridmet = GridMET(dates, variables, snow)
 
-    crs = ogc.validate_crs(crs)
-    _geometry = geoutils.geo2polygon(geometry, crs, 4326)
-
+    crs = utils.validate_crs(crs)
+    _geometry = utils.to_geometry(geometry, crs, 4326)
     if not _geometry.intersects(shapely.box(*gridmet.bounds)):
         raise InputRangeError("geometry", f"within {gridmet.bounds}")
 
-    urls, kwds = _gridded_urls(
+    urls = _gridded_urls(
         _geometry.bounds,  # pyright: ignore[reportGeneralTypeIssues]
         gridmet.variables,  # pyright: ignore[reportArgumentType]
         gridmet.date_iterator,
@@ -471,19 +402,14 @@ def get_bygeom(
     )
 
     long2abbr = {v: k for k, v in gridmet.long_names.items()}
-    clm_files = [
-        Path("cache", f"{_match(u)}_{ogc.create_request_key('GET', u, **p)}.nc")
-        for u, p in zip(urls, kwds)
-    ]
-    clm = _download_urls(urls, kwds, clm_files, ssl, long2abbr)
+    clm = _download_urls(urls, long2abbr)
     clm = xr.where(clm < gridmet.missing_value, clm, np.nan, keep_attrs=True)
 
     for v in clm:
         clm[v] = clm[v].rio.write_nodata(np.nan)
-    clm = clm.rio.set_spatial_dims(x_dim="lon", y_dim="lat")
-    clm = geoutils.xd_write_crs(clm, 4326, "spatial_ref").drop_vars("crs")
+    clm = clm.rio.set_spatial_dims(x_dim="lon", y_dim="lat").rio.write_crs(4326)
     clm = cast("xr.Dataset", clm)
-    clm = geoutils.xarray_geomask(clm, _geometry, 4326)
+    clm = utils.clip_dataset(clm, _geometry, 4326)
     abbrs = {v: k for k, v in gridmet.long_names.items() if v in clm}
     abbrs["day"] = "time"
     clm = clm.rename(abbrs)
@@ -531,5 +457,5 @@ def get_conus(
         raise InputTypeError("variables", f"one of {GridMET.variables}")
     base_url = "https://www.northwestknowledge.net/metdata/data/{}_{}.nc"
     urls = [base_url.format(v, yr) for v in var_list for yr in yr_list]
-    fnames = [Path(save_dir, url.split("/")[-1]) for url in urls]
-    return ogc.streaming_download(urls, fnames=fnames, n_jobs=MAX_CONN)
+    file_names = [Path(save_dir, url.split("/")[-1]) for url in urls]
+    return utils.download_files(urls, "nc", file_names=file_names)

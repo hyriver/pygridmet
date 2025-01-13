@@ -6,8 +6,6 @@ import io
 import shutil
 from pathlib import Path
 
-import cytoolz.curried as tlz
-import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
@@ -39,7 +37,7 @@ def assert_close(a: float, b: float, rtol: float = 1e-3) -> bool:
 
 
 class TestByCoords:
-    @pytest.mark.speedup
+    @pytest.mark.jit
     def test_snow(self):
         clm = gridmet.get_bycoords(COORDS, DATES, snow=True, crs=ALT_CRS)
         assert_close(clm["snow (mm)"].mean(), 0.0)
@@ -54,7 +52,7 @@ class TestByCoords:
 
 
 class TestByGeom:
-    @pytest.mark.speedup
+    @pytest.mark.jit
     def test_snow(self):
         clm = gridmet.get_bygeom(GEOM, DAY, snow=True, snow_params={"t_snow": 0.5})
         assert_close(clm.snow.mean().item(), 3.4895)
@@ -72,6 +70,8 @@ class TestCLI:
     """Test the command-line interface."""
 
     def test_geometry(self, runner):
+        import geopandas as gpd
+
         params = {
             "id": "geo_test",
             "start": "2000-01-01",
@@ -87,10 +87,9 @@ class TestCLI:
             [
                 "geometry",
                 str(geo_gpkg),
-                *list(tlz.concat([["-v", v] for v in VAR])),
+                *[item for v in VAR for item in ["-v", v]],
                 "-s",
                 save_dir,
-                "--disable_ssl",
             ],
         )
         if geo_gpkg.is_dir():
@@ -102,7 +101,7 @@ class TestCLI:
         assert ret.exit_code == 0
         assert "Found 1 geometry" in ret.output
 
-    @pytest.mark.speedup
+    @pytest.mark.jit
     def test_coords(self, runner):
         params = {
             "id": "coords_test",
@@ -121,10 +120,9 @@ class TestCLI:
             [
                 "coords",
                 coord_csv,
-                *list(tlz.concat([["-v", v] for v in VAR])),
+                *[item for v in VAR for item in ["-v", v]],
                 "-s",
                 save_dir,
-                "--disable_ssl",
             ],
         )
         runner.invoke(
@@ -132,10 +130,9 @@ class TestCLI:
             [
                 "coords",
                 coord_csv,
-                *list(tlz.concat([["-v", v] for v in VAR])),
+                *[item for v in VAR for item in ["-v", v]],
                 "-s",
                 save_dir,
-                "--disable_ssl",
             ],
         )
         Path(coord_csv).unlink()
