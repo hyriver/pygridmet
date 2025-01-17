@@ -143,10 +143,10 @@ class TestCLI:
 
 
 def test_conus(runner):
-    fnames = gridmet.get_conus(2010, variables="tmmn")
+    save_dir = "test_conus"
+    fnames = gridmet.get_conus(2010, "tmmn", save_dir)
     assert fnames[0].exists()
 
-    save_dir = "test_conus"
     ret = runner.invoke(cli, ["conus", "-y", 2010, "-v", "tmmn", "-s", save_dir])
     assert Path(save_dir, "tmmn_2010.nc").exists()
     shutil.rmtree(save_dir, ignore_errors=True)
