@@ -44,7 +44,7 @@ dependencies = [
   "pyproj>=3.0.1",
   "rioxarray>=0.15",
   "shapely>=2",
-  "urllib3",
+  "async-retriever",
   "xarray>=2024.7",
 ]
 optional-dependencies.cli = [
