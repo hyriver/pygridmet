@@ -338,7 +338,7 @@ def _download_urls(
 
 
 def get_bygeom(
-    geometry: Polygon | MultiPolygon | tuple[float, float, float, float],
+    geometry: Polygon | tuple[float, float, float, float],
     dates: tuple[str, str] | int | list[int],
     crs: CRSType = 4326,
     variables: Iterable[VARS] | VARS | None = None,
@@ -349,8 +349,9 @@ def get_bygeom(
 
     Parameters
     ----------
-    geometry : Polygon, MultiPolygon, or bbox
-        The geometry of the region of interest.
+    geometry : Polygon or tuple
+        The geometry of the region of interest. It can be a shapely Polygon or a tuple
+        of length 4 representing the bounding box (minx, miny, maxx, maxy).
     dates : tuple or list, optional
         Start and end dates as a tuple (start, end) or a list of years [2001, 2010, ...].
     crs : str, int, or pyproj.CRS, optional
