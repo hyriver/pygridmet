@@ -6,7 +6,6 @@ import hashlib
 import os
 import re
 from collections.abc import Iterable
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -15,22 +14,22 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 import pyproj
 import shapely
-import urllib3
 from pyproj import Transformer
 from pyproj.exceptions import CRSError as ProjCRSError
 from rioxarray.exceptions import OneDimensionalRaster
 from shapely import MultiPolygon, Polygon, ops
 
-from pygridmet.exceptions import DownloadError, InputRangeError, InputTypeError
+from pygridmet._streaming import stream_write
+from pygridmet.exceptions import InputRangeError, InputTypeError
 
 if TYPE_CHECKING:
     import xarray as xr
     from numpy.typing import NDArray
     from shapely.geometry.base import BaseGeometry
 
-    CRSTYPE = int | str | pyproj.CRS
-    POLYTYPE = Polygon | MultiPolygon | tuple[float, float, float, float]
-    NUMBER = int | float | np.number
+    CRSType = int | str | pyproj.CRS
+    PolyType = Polygon | MultiPolygon | tuple[float, float, float, float]
+    Number = int | float | np.number
 
 __all__ = [
     "clip_dataset",
@@ -40,10 +39,11 @@ __all__ = [
     "validate_coords",
     "validate_crs",
 ]
+
 TransformerFromCRS = lru_cache(Transformer.from_crs)
 
 
-def validate_crs(crs: CRSTYPE) -> str:
+def validate_crs(crs: CRSType) -> str:
     """Validate a CRS.
 
     Parameters
@@ -63,7 +63,7 @@ def validate_crs(crs: CRSTYPE) -> str:
 
 
 def transform_coords(
-    coords: Iterable[tuple[float, float]], in_crs: CRSTYPE, out_crs: CRSTYPE
+    coords: Iterable[tuple[float, float]], in_crs: CRSType, out_crs: CRSType
 ) -> list[tuple[float, float]]:
     """Transform coordinates from one CRS to another."""
     try:
@@ -75,7 +75,7 @@ def transform_coords(
     return list(zip(x_proj, y_proj))
 
 
-def _geo_transform(geom: BaseGeometry, in_crs: CRSTYPE, out_crs: CRSTYPE) -> BaseGeometry:
+def _geo_transform(geom: BaseGeometry, in_crs: CRSType, out_crs: CRSType) -> BaseGeometry:
     """Transform a geometry from one CRS to another."""
     project = TransformerFromCRS(in_crs, out_crs, always_xy=True).transform
     return ops.transform(project, geom)
@@ -96,8 +96,8 @@ def validate_coords(
 
 def to_geometry(
     geometry: BaseGeometry | tuple[float, float, float, float],
-    geo_crs: CRSTYPE | None = None,
-    crs: CRSTYPE | None = None,
+    geo_crs: CRSType | None = None,
+    crs: CRSType | None = None,
 ) -> BaseGeometry:
     """Return a Shapely geometry and optionally transformed to a new CRS.
 
@@ -128,21 +128,6 @@ def to_geometry(
     elif geo_crs is None and crs is not None:
         return geom
     raise InputTypeError("geo_crs/crs", "either both None or both valid CRS")
-
-
-def _download(
-    url: str, fname: Path, http: urllib3.HTTPConnectionPool | urllib3.HTTPSConnectionPool
-) -> None:
-    """Download a file from a URL."""
-    parsed_url = urlparse(url)
-    query = parsed_url.query
-    path = f"{parsed_url.path}?{parsed_url.query}" if query else parsed_url.path
-    head = http.request("HEAD", path)
-    fsize = int(head.headers.get("Content-Length", -1))
-    if fname.exists() and fname.stat().st_size == fsize:
-        return
-    fname.unlink(missing_ok=True)
-    fname.write_bytes(http.request("GET", path).data)
 
 
 def find_var(url: str) -> str:
@@ -187,54 +172,14 @@ def download_files(
 
     if rewrite:
         _ = [f.unlink(missing_ok=True) for f in file_list]
-
-    max_workers = min(4, os.cpu_count() or 1, len(url_list))
-    paserd_url = urlparse(url_list[0])
-    if paserd_url.scheme == "https":
-        http = urllib3.HTTPSConnectionPool(
-            paserd_url.netloc,
-            maxsize=10,
-            block=True,
-            retries=urllib3.Retry(
-                total=5,
-                backoff_factor=0.5,
-                status_forcelist=[500, 502, 504],
-                allowed_methods=["HEAD", "GET"],
-            ),
-        )
-    else:
-        http = urllib3.HTTPConnectionPool(
-            paserd_url.netloc,
-            maxsize=10,
-            block=True,
-            retries=urllib3.Retry(
-                total=5,
-                backoff_factor=0.5,
-                status_forcelist=[500, 502, 504],
-                allowed_methods=["HEAD", "GET"],
-            ),
-        )
-    if max_workers == 1:
-        _ = [_download(url, path, http) for url, path in zip(url_list, file_list)]
-        return file_list
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_url = {
-            executor.submit(_download, url, path, http): url
-            for url, path in zip(url_list, file_list)
-        }
-        for future in as_completed(future_to_url):
-            try:
-                future.result()
-            except Exception as e:  # noqa: PERF203
-                raise DownloadError(future_to_url[future], e) from e
+    stream_write(url_list, file_list)
     return file_list
 
 
 def clip_dataset(
     ds: xr.Dataset,
     geometry: Polygon | MultiPolygon | tuple[float, float, float, float],
-    crs: CRSTYPE,
+    crs: CRSType,
 ) -> xr.Dataset:
     """Mask a ``xarray.Dataset`` based on a geometry."""
     attrs = {v: ds[v].attrs for v in ds}

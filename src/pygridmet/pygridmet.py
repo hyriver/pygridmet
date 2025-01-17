@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     import pyproj
     from shapely import MultiPolygon, Polygon
 
-    CRSTYPE = Union[int, str, pyproj.CRS]
+    CRSType = Union[int, str, pyproj.CRS]
     VARS = Literal[
         "pr",
         "rmax",
@@ -80,7 +80,7 @@ def _get_lon_lat(
     coords: list[tuple[float, float]] | tuple[float, float],
     bounds: tuple[float, float, float, float],
     coords_id: Sequence[str | int] | None,
-    crs: CRSTYPE,
+    crs: CRSType,
     to_xarray: bool,
 ) -> tuple[list[float], list[float]]:
     """Get longitude and latitude from a list of coordinates."""
@@ -126,7 +126,7 @@ def get_bycoords(
     coords: list[tuple[float, float]] | tuple[float, float],
     dates: tuple[str, str] | int | list[int],
     coords_id: Sequence[str | int] | None = None,
-    crs: CRSTYPE = 4326,
+    crs: CRSType = 4326,
     variables: Iterable[VARS] | VARS | None = None,
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
@@ -340,7 +340,7 @@ def _download_urls(
 def get_bygeom(
     geometry: Polygon | MultiPolygon | tuple[float, float, float, float],
     dates: tuple[str, str] | int | list[int],
-    crs: CRSTYPE = 4326,
+    crs: CRSType = 4326,
     variables: Iterable[VARS] | VARS | None = None,
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
@@ -405,7 +405,8 @@ def get_bygeom(
     clm = _download_urls(urls, long2abbr)
     clm = xr.where(clm < gridmet.missing_value, clm, np.nan, keep_attrs=True)
 
-    for v in clm:
+    for v in clm.data_vars:
+        _ = clm[v].attrs.pop("grid_mapping", None)
         clm[v] = clm[v].rio.write_nodata(np.nan)
     clm = clm.rio.set_spatial_dims(x_dim="lon", y_dim="lat").rio.write_crs(4326)
     clm = cast("xr.Dataset", clm)
