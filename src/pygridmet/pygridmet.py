@@ -6,7 +6,7 @@ import itertools
 import re
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Union, cast
+from typing import TYPE_CHECKING, Literal, cast
 from urllib.parse import urlencode
 
 import numpy as np
@@ -21,11 +21,11 @@ from pygridmet.exceptions import InputRangeError, InputTypeError, ServiceError
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    import pyproj
-    from shapely import MultiPolygon, Polygon
+    from pyproj import CRS
+    from shapely import Polygon
 
-    CRSType = Union[int, str, pyproj.CRS]
-    VARS = Literal[
+    CRSType = int | str | CRS
+    GMVars = Literal[
         "pr",
         "rmax",
         "rmin",
@@ -45,7 +45,6 @@ if TYPE_CHECKING:
     ]
 
 DATE_FMT = "%Y-%m-%dT%H:%M:%SZ"
-MAX_CONN = 4
 N_RETRIES = 15
 URL = "http://thredds.northwestknowledge.net:8080/thredds/ncss"
 
@@ -54,7 +53,7 @@ __all__ = ["get_bycoords", "get_bygeom", "get_conus"]
 
 def _coord_urls(
     coords_list: Iterable[tuple[float, float]],
-    variables: Iterable[VARS],
+    variables: Iterable[GMVars],
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     long_names: dict[str, str],
 ) -> list[str]:
@@ -127,7 +126,7 @@ def get_bycoords(
     dates: tuple[str, str] | int | list[int],
     coords_id: Sequence[str | int] | None = None,
     crs: CRSType = 4326,
-    variables: Iterable[VARS] | VARS | None = None,
+    variables: Iterable[GMVars] | GMVars | None = None,
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
     to_xarray: bool = False,
@@ -227,7 +226,7 @@ def get_bycoords(
 
 def _gridded_urls(
     bounds: tuple[float, float, float, float],
-    variables: Iterable[VARS],
+    variables: Iterable[GMVars],
     dates: list[tuple[pd.Timestamp, pd.Timestamp]],
     long_names: dict[str, str],
 ) -> list[str]:
@@ -341,7 +340,7 @@ def get_bygeom(
     geometry: Polygon | tuple[float, float, float, float],
     dates: tuple[str, str] | int | list[int],
     crs: CRSType = 4326,
-    variables: Iterable[VARS] | VARS | None = None,
+    variables: Iterable[GMVars] | GMVars | None = None,
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
 ) -> xr.Dataset:
@@ -426,7 +425,7 @@ def get_bygeom(
 
 def get_conus(
     years: int | list[int],
-    variables: VARS | list[VARS] | None = None,
+    variables: GMVars | list[GMVars] | None = None,
     save_dir: str | Path = "clm_gridmet",
 ) -> list[Path | None]:
     """Get the entire CONUS data for the specified years and variables.
