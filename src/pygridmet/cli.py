@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypeVar
 
 import click
-import geopandas as gpd
 import pandas as pd
 
 from pygridmet import pygridmet as gridmet
@@ -18,6 +17,8 @@ from pygridmet.exceptions import (
 )
 
 if TYPE_CHECKING:
+    import geopandas as gpd
+
     DFType = TypeVar("DFType", pd.DataFrame, gpd.GeoDataFrame)
     VARS = Literal[
         "pr",
@@ -190,6 +191,10 @@ def geometry(
     Examples:
         $ pygridmet geometry geo.gpkg -v prcp -v tmin
     """  # noqa: D301
+    try:
+        import geopandas as gpd
+    except ImportError as e:
+        raise ImportError("This command requires geopandas") from e
     fpath = Path(fpath)
     if fpath.suffix not in (".shp", ".gpkg"):
         raise InputTypeError("file", ".shp or .gpkg")
