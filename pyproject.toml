@@ -40,7 +40,6 @@ dependencies = [
   "aiofiles",
   "aiohttp>=3.8.3",
   "click>=0.7",
-  "nest-asyncio",
   "netcdf4",
   "numpy>=2",
   "pandas>=1",
@@ -244,6 +243,9 @@ exclude_lines = [
   "if TYPE_CHECKING:",
 ]
 ignore_errors = true
+omit = [
+  "**/__init__.py",
+]
 
 [tool.coverage.paths]
 source = [ "src", "*/site-packages" ]
@@ -253,9 +255,6 @@ branch = true
 parallel = true
 source_pkgs = [
   "pygridmet",
-]
-omit = [
-  "**/__init__.py",
 ]
 
 [tool.pyright]
