@@ -14,12 +14,12 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 import pyproj
 import shapely
-import tiny_retriever as terry
 from pyproj import Transformer
 from pyproj.exceptions import CRSError as ProjCRSError
 from rioxarray.exceptions import OneDimensionalRaster
 from shapely import MultiPolygon, Polygon, ops
 
+import tiny_retriever as terry
 from pygridmet.exceptions import InputRangeError, InputTypeError
 
 if TYPE_CHECKING:
