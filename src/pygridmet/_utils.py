@@ -14,12 +14,12 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 import pyproj
 import shapely
+import tiny_retriever as terry
 from pyproj import Transformer
 from pyproj.exceptions import CRSError as ProjCRSError
 from rioxarray.exceptions import OneDimensionalRaster
 from shapely import MultiPolygon, Polygon, ops
 
-from pygridmet._streaming import stream_write
 from pygridmet.exceptions import InputRangeError, InputTypeError
 
 if TYPE_CHECKING:
@@ -172,7 +172,7 @@ def download_files(
 
     if rewrite:
         _ = [f.unlink(missing_ok=True) for f in file_list]
-    stream_write(url_list, file_list)
+    terry.download(url_list, file_list)
     return file_list
 
 
