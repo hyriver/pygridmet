@@ -37,8 +37,6 @@ dynamic = [
   "version",
 ]
 dependencies = [
-  "aiofiles",
-  "aiohttp>=3.8.3",
   "click>=0.7",
   "netcdf4",
   "numpy>=2",
@@ -46,6 +44,7 @@ dependencies = [
   "pyproj>=3.0.1",
   "rioxarray>=0.15",
   "shapely>=2",
+  "tiny-retriever>=0.1.3",
   "xarray>=2024.7",
 ]
 optional-dependencies.cli = [
@@ -205,6 +204,7 @@ lint.isort.known-first-party = [
   "pydaymet",
   "pygridmet",
   "pynldas2",
+  "tiny_retriever",
 ]
 lint.isort.required-imports = [ "from __future__ import annotations" ]
 
