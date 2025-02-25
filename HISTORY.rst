@@ -2,15 +2,15 @@
 History
 =======
 
-0.19.3 (2025-XX-XX)
+0.19.3 (2025-02-24)
 -------------------
 
 Internal Changes
 ~~~~~~~~~~~~~~~~
-- Refactor the package to run in Jupyter notebooks without using
-  ``nest_asyncio``. This is done by creating and initializing a
-  single global event loop thread dedicated to only running the
-  asynchronous parts of this package.
+- Use [TinyRetriever](https://github.com/cheginit/tiny-retriever) for
+  all server requests. It offers the same functionalities as the previous
+  ``_streaming`` module and has the same dependencies. It has a more robust
+  handling of async threads and is more efficient.
 
 0.19.2 (2025-01-17)
 -------------------
