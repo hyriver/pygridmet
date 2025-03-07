@@ -151,8 +151,9 @@ def _get_prefix(url: str) -> str:
 def download_files(
     url_list: list[str],
     f_ext: Literal["csv", "nc"],
-    file_names: list[Path] | None = None,
-    rewrite: bool = False,
+    file_names: list[Path] | None,
+    validate_filesize: bool,
+    timeout: int,
 ) -> list[Path]:
     """Download multiple files concurrently."""
     if file_names is None:
@@ -170,9 +171,9 @@ def download_files(
     else:
         file_list = file_names
 
-    if rewrite:
-        _ = [f.unlink(missing_ok=True) for f in file_list]
-    terry.download(url_list, file_list)
+    if not validate_filesize and all(f.exists() and f.stat().st_size > 0 for f in file_list):
+        return file_list
+    terry.download(url_list, file_list, timeout=timeout)
     return file_list
 
 

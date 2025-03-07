@@ -109,7 +109,7 @@ def _by_coord(
     # Rename the columns from their long names to abbreviations and
     # put the units in parentheses
     abbrs = {v: k for k, v in gridmet.long_names.items()}
-    clm.columns = clm.columns.str.replace(r'\[unit="(.+)"\]', "", regex=True)
+    clm.columns = clm.columns.str.replace(r'\[unit=".*?"\]', "", regex=True)
     clm.columns = clm.columns.map(abbrs).map(lambda x: f"{x} ({gridmet.units[x]})")
 
     clm.index = pd.DatetimeIndex(clm.index.date, name="time")
@@ -130,6 +130,8 @@ def get_bycoords(
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
     to_xarray: bool = False,
+    conn_timeout: int = 1000,
+    validate_filesize: bool = True,
 ) -> pd.DataFrame | xr.Dataset:
     """Get point-data from the GridMET database at 1-km resolution.
 
@@ -161,6 +163,15 @@ def get_bycoords(
         https://doi.org/10.5194/gmd-11-1077-2018.
     to_xarray : bool, optional
         Return the data as an ``xarray.Dataset``. Defaults to ``False``.
+    conn_timeout : int, optional
+        Connection timeout in seconds, defaults to 1000.
+    validate_filesize : bool, optional
+        When set to ``True``, the function checks the file size of the previously
+        cached files and will re-download if the local filesize does not match
+        that of the remote. Defaults to ``True``. Setting this to ``False``
+        can be useful when you are sure that the cached files are not corrupted and just
+        want to get the combined dataset more quickly. This is faster because it avoids
+        web requests that are necessary for getting the file sizes.
 
     Returns
     -------
@@ -188,7 +199,7 @@ def get_bycoords(
     urls = _coord_urls(zip(lon, lat), gridmet.variables, gridmet.date_iterator, gridmet.long_names)
     # group based on lon, lat, and variable, i.e, dict of dict of list
     grouped_files = {}
-    for file in utils.download_files(urls, "csv"):
+    for file in utils.download_files(urls, "csv", None, validate_filesize, conn_timeout):
         x, y, v = file.name.split("_")[:3]
         x, y = float(x), float(y)
         if (x, y) not in grouped_files:
@@ -300,9 +311,11 @@ def _check_nans(
 def _download_urls(
     urls: list[str],
     long2abbr: dict[str, str],
+    validate_filesize: bool,
+    conn_timeout: int,
 ) -> xr.Dataset:
     """Download the URLs and return the dataset."""
-    clm_all_files = utils.download_files(urls, "nc")
+    clm_all_files = utils.download_files(urls, "nc", None, validate_filesize, conn_timeout)
     clm_files = clm_all_files.copy()
     clm = None
     # Sometimes the server returns NaNs, so we must check for that, remove
@@ -314,13 +327,13 @@ def _download_urls(
             clm = xr.merge(_open_dataset(f) for f in clm_all_files).astype("f4")
         except ValueError:
             _ = [f.unlink() for f in clm_files]
-            clm_files = utils.download_files(urls, "nc")
+            clm_files = utils.download_files(urls, "nc", None, validate_filesize, conn_timeout)
             clm = None
             continue
 
         has_nans, urls = _check_nans(clm, urls, clm_files, long2abbr)
         if has_nans:
-            clm_files = utils.download_files(urls, "nc")
+            clm_files = utils.download_files(urls, "nc", None, validate_filesize, conn_timeout)
             clm = None
             continue
         break
@@ -343,6 +356,8 @@ def get_bygeom(
     variables: Iterable[GMVars] | GMVars | None = None,
     snow: bool = False,
     snow_params: dict[str, float] | None = None,
+    conn_timeout: int = 1000,
+    validate_filesize: bool = True,
 ) -> xr.Dataset:
     """Get gridded data from the GridMET database at 1-km resolution.
 
@@ -370,6 +385,15 @@ def get_bygeom(
         ``t_snow`` (deg C) which is the threshold for temperature for considering snow.
         The default values are ``{'t_rain': 2.5, 't_snow': 0.6}`` that are adopted from
         https://doi.org/10.5194/gmd-11-1077-2018.
+    conn_timeout : int, optional
+        Connection timeout in seconds, defaults to 1000.
+    validate_filesize : bool, optional
+        When set to ``True``, the function checks the file size of the previously
+        cached files and will re-download if the local filesize does not match
+        that of the remote. Defaults to ``True``. Setting this to ``False``
+        can be useful when you are sure that the cached files are not corrupted and just
+        want to get the combined dataset more quickly. This is faster because it avoids
+        web requests that are necessary for getting the file sizes.
 
     Returns
     -------
@@ -402,7 +426,7 @@ def get_bygeom(
     )
 
     long2abbr = {v: k for k, v in gridmet.long_names.items()}
-    clm = _download_urls(urls, long2abbr)
+    clm = _download_urls(urls, long2abbr, validate_filesize, conn_timeout)
     clm = xr.where(clm < gridmet.missing_value, clm, np.nan, keep_attrs=True)
 
     for v in clm.data_vars:
@@ -427,6 +451,8 @@ def get_conus(
     years: int | list[int],
     variables: GMVars | list[GMVars] | None = None,
     save_dir: str | Path = "clm_gridmet",
+    conn_timeout: int = 1000,
+    validate_filesize: bool = True,
 ) -> list[Path | None]:
     """Get the entire CONUS data for the specified years and variables.
 
@@ -441,6 +467,15 @@ def get_conus(
         The directory to store the downloaded data, defaults to ``./clm_gridmet``.
         The files are stored in the NetCDF format and the file names are based
         on the variable names and the years, e.g., ``tmmn_2010.nc``.
+    conn_timeout : int, optional
+        Connection timeout in seconds, defaults to 1000.
+    validate_filesize : bool, optional
+        When set to ``True``, the function checks the file size of the previously
+        cached files and will re-download if the local filesize does not match
+        that of the remote. Defaults to ``True``. Setting this to ``False``
+        can be useful when you are sure that the cached files are not corrupted and just
+        want to get the combined dataset more quickly. This is faster because it avoids
+        web requests that are necessary for getting the file sizes.
 
     Returns
     -------
@@ -459,4 +494,4 @@ def get_conus(
     base_url = "https://www.northwestknowledge.net/metdata/data/{}_{}.nc"
     urls = [base_url.format(v, yr) for v in var_list for yr in yr_list]
     file_names = [Path(save_dir, url.split("/")[-1]) for url in urls]
-    return utils.download_files(urls, "nc", file_names=file_names)
+    return utils.download_files(urls, "nc", file_names, validate_filesize, conn_timeout)
