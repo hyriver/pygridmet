@@ -63,7 +63,7 @@ def validate_crs(crs: CRSType) -> str:
 
 
 def transform_coords(
-    coords: Iterable[tuple[float, float]], in_crs: CRSType, out_crs: CRSType
+    coords: Iterable[tuple[float, float]] | tuple[float, float], in_crs: CRSType, out_crs: CRSType
 ) -> list[tuple[float, float]]:
     """Transform coordinates from one CRS to another."""
     try:
@@ -185,13 +185,14 @@ def clip_dataset(
     """Mask a ``xarray.Dataset`` based on a geometry."""
     attrs = {v: ds[v].attrs for v in ds}
 
-    geom = to_geometry(geometry, crs, ds.rio.crs)
-    try:
-        ds = ds.rio.clip_box(*geom.bounds, auto_expand=True)
-        if isinstance(geometry, (Polygon, MultiPolygon)):
-            ds = ds.rio.clip([geom])
-    except OneDimensionalRaster:
-        ds = ds.rio.clip([geom], all_touched=True)
+    if ds.rio.width > 1 and ds.rio.height > 1:
+        geom = to_geometry(geometry, crs, ds.rio.crs)
+        try:
+            ds = ds.rio.clip_box(*geom.bounds, auto_expand=True)
+            if isinstance(geometry, (Polygon, MultiPolygon)):
+                ds = ds.rio.clip([geom])
+        except OneDimensionalRaster:
+            ds = ds.rio.clip([geom], all_touched=True)
 
     _ = [ds[v].rio.update_attrs(attrs[v], inplace=True) for v in ds]
     ds.rio.update_encoding(ds.encoding, inplace=True)
