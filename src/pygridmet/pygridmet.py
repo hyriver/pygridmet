@@ -21,6 +21,7 @@ from pygridmet.exceptions import InputRangeError, InputTypeError, ServiceError
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from numpy.typing import NDArray
     from pyproj import CRS
     from shapely import Polygon
 
@@ -51,188 +52,21 @@ URL = "http://thredds.northwestknowledge.net:8080/thredds/ncss"
 __all__ = ["get_bycoords", "get_bygeom", "get_conus"]
 
 
-def _coord_urls(
-    coords_list: Iterable[tuple[float, float]],
-    variables: Iterable[GMVars],
-    dates: list[tuple[pd.Timestamp, pd.Timestamp]],
-    long_names: dict[str, str],
-) -> list[str]:
-    """Generate an iterable URL list for downloading GridMET data."""
-    return [
-        f"{URL}/agg_met_{v}_1979_CurrentYear_CONUS.nc?"
-        + urlencode(
-            {
-                "var": long_names[v],
-                "longitude": f"{lon:0.6f}",
-                "latitude": f"{lat:0.6f}",
-                "time_start": s.strftime(DATE_FMT),
-                "time_end": e.strftime(DATE_FMT),
-                "accept": "csv",
-            }
-        )
-        for lon, lat in coords_list
-        for v, (s, e) in itertools.product(variables, dates)
-    ]
-
-
-def _get_lon_lat(
+def _coords_to_bounds(
     coords: list[tuple[float, float]] | tuple[float, float],
     bounds: tuple[float, float, float, float],
     coords_id: Sequence[str | int] | None,
     crs: CRSType,
     to_xarray: bool,
-) -> tuple[list[float], list[float]]:
+) -> tuple[list[tuple[float, float]], NDArray[np.float64]]:
     """Get longitude and latitude from a list of coordinates."""
     coords_list = utils.transform_coords(coords, crs, 4326)
 
     if to_xarray and coords_id is not None and len(coords_id) != len(coords_list):
         raise InputTypeError("coords_id", "list with the same length as of coords")
 
-    lon, lat = utils.validate_coords(coords_list, bounds).T
-    return lon.tolist(), lat.tolist()
-
-
-def _by_coord(
-    csv_files: dict[str, list[Path]],
-    gridmet: GridMET,
-    snow: bool,
-    snow_params: dict[str, float] | None,
-) -> pd.DataFrame:
-    """Get climate data for a coordinate and return as a DataFrame."""
-    clm = pd.concat(
-        (
-            pd.concat(pd.read_csv(f, parse_dates=[0], usecols=[0, 3], index_col=[0]) for f in files)
-            for _, files in csv_files.items()
-        ),
-        axis=1,
-    )
-    # Rename the columns from their long names to abbreviations and
-    # put the units in parentheses
-    abbrs = {v: k for k, v in gridmet.long_names.items()}
-    clm.columns = clm.columns.str.replace(r'\[unit=".*?"\]', "", regex=True)
-    clm.columns = clm.columns.map(abbrs).map(lambda x: f"{x} ({gridmet.units[x]})")
-
-    clm.index = pd.DatetimeIndex(clm.index.date, name="time")
-    clm = clm.where(clm < gridmet.missing_value)
-
-    if snow:
-        params = {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
-        clm = gridmet.separate_snow(clm, **params)
-    return clm
-
-
-def get_bycoords(
-    coords: list[tuple[float, float]] | tuple[float, float],
-    dates: tuple[str, str] | int | list[int],
-    coords_id: Sequence[str | int] | None = None,
-    crs: CRSType = 4326,
-    variables: Iterable[GMVars] | GMVars | None = None,
-    snow: bool = False,
-    snow_params: dict[str, float] | None = None,
-    to_xarray: bool = False,
-    conn_timeout: int = 1000,
-    validate_filesize: bool = True,
-) -> pd.DataFrame | xr.Dataset:
-    """Get point-data from the GridMET database at 1-km resolution.
-
-    Parameters
-    ----------
-    coords : tuple or list of tuples
-        Coordinates of the location(s) of interest as a tuple (x, y)
-    dates : tuple or list, optional
-        Start and end dates as a tuple (start, end) or a list of years ``[2001, 2010, ...]``.
-    coords_id : list of int or str, optional
-        A list of identifiers for the coordinates. This option only applies when ``to_xarray``
-        is set to ``True``. If not provided, the coordinates will be enumerated.
-    crs : str, int, or pyproj.CRS, optional
-        The CRS of the input coordinates, defaults to ``EPSG:4326``.
-    variables : str or list
-        List of variables to be downloaded. The acceptable variables are:
-        ``pr``, ``rmax``, ``rmin``, ``sph``, ``srad``, ``th``, ``tmmn``, ``tmmx``, ``vs``,
-        ``bi``, ``fm100``, ``fm1000``, ``erc``, ``etr``, ``pet``, and ``vpd``.
-        Descriptions can be found `here <https://www.climatologylab.org/gridmet.html>`__.
-        Defaults to ``None``, i.e., all the variables are downloaded.
-    snow : bool, optional
-        Compute snowfall from precipitation and minimum temperature. Defaults to ``False``.
-    snow_params : dict, optional
-        Model-specific parameters as a dictionary that is passed to the snowfall function.
-        These parameters are only used if ``snow`` is ``True``. Two parameters are required:
-        ``t_rain`` (deg C) which is the threshold for temperature for considering rain and
-        ``t_snow`` (deg C) which is the threshold for temperature for considering snow.
-        The default values are ``{'t_rain': 2.5, 't_snow': 0.6}`` that are adopted from
-        https://doi.org/10.5194/gmd-11-1077-2018.
-    to_xarray : bool, optional
-        Return the data as an ``xarray.Dataset``. Defaults to ``False``.
-    conn_timeout : int, optional
-        Connection timeout in seconds, defaults to 1000.
-    validate_filesize : bool, optional
-        When set to ``True``, the function checks the file size of the previously
-        cached files and will re-download if the local filesize does not match
-        that of the remote. Defaults to ``True``. Setting this to ``False``
-        can be useful when you are sure that the cached files are not corrupted and just
-        want to get the combined dataset more quickly. This is faster because it avoids
-        web requests that are necessary for getting the file sizes.
-
-    Returns
-    -------
-    pandas.DataFrame or xarray.Dataset
-        Daily climate data for a single or list of locations.
-
-    Examples
-    --------
-    >>> import pygridmet as gridmet
-    >>> coords = (-1431147.7928, 318483.4618)
-    >>> dates = ("2000-01-01", "2000-01-31")
-    >>> clm = gridmet.get_bycoords(
-    ...     coords,
-    ...     dates,
-    ...     crs=3542,
-    ... )
-    >>> clm["pr (mm)"].mean()
-    9.677
-    """
-    gridmet = GridMET(dates, variables, snow)
-
-    lon, lat = _get_lon_lat(coords, gridmet.bounds, coords_id, crs, to_xarray)
-    n_pts = len(lon)
-
-    urls = _coord_urls(zip(lon, lat), gridmet.variables, gridmet.date_iterator, gridmet.long_names)
-    # group based on lon, lat, and variable, i.e, dict of dict of list
-    grouped_files = {}
-    for file in utils.download_files(urls, "csv", None, validate_filesize, conn_timeout):
-        x, y, v = file.name.split("_")[:3]
-        x, y = float(x), float(y)
-        if (x, y) not in grouped_files:
-            grouped_files[(x, y)] = {}
-        if v not in grouped_files[(x, y)]:
-            grouped_files[(x, y)][v] = []
-
-        grouped_files[(x, y)][v].append(file)
-
-    idx = list(coords_id) if coords_id is not None else list(range(n_pts))
-    idx = dict(zip(zip(lon, lat), idx))
-    clm_list = {
-        idx[c]: _by_coord(files, gridmet, snow, snow_params) for c, files in grouped_files.items()
-    }
-
-    if to_xarray:
-        clm_ds = xr.concat(
-            (xr.Dataset.from_dataframe(clm) for clm in clm_list.values()),
-            dim=pd.Index(list(clm_list), name="id"),
-        )
-        clm_ds = clm_ds.rename(
-            {n: re.sub(r"\([^\)]*\)", "", str(n)).strip() for n in clm_ds.data_vars}
-        )
-        for v in clm_ds.data_vars:
-            clm_ds[v].attrs["units"] = gridmet.units[v]
-            clm_ds[v].attrs["long_name"] = gridmet.long_names[v]
-        clm_ds["lat"] = (("id",), lat)
-        clm_ds["lon"] = (("id",), lon)
-        return clm_ds
-
-    if n_pts == 1:
-        return next(iter(clm_list.values()), pd.DataFrame())
-    return pd.concat(clm_list.values(), keys=list(clm_list), axis=1, names=["id", "variable"])
+    points = shapely.points(utils.validate_coords(coords_list, bounds))
+    return coords_list, shapely.bounds(shapely.buffer(points, 0.05)).round(6)
 
 
 def _gridded_urls(
@@ -445,6 +279,116 @@ def get_bygeom(
         params = {"t_rain": T_RAIN, "t_snow": T_SNOW} if snow_params is None else snow_params
         clm = gridmet.separate_snow(clm, **params)
     return clm
+
+
+def get_bycoords(
+    coords: list[tuple[float, float]] | tuple[float, float],
+    dates: tuple[str, str] | int | list[int],
+    coords_id: Sequence[str | int] | None = None,
+    crs: CRSType = 4326,
+    variables: Iterable[GMVars] | GMVars | None = None,
+    snow: bool = False,
+    snow_params: dict[str, float] | None = None,
+    to_xarray: bool = False,
+    conn_timeout: int = 1000,
+    validate_filesize: bool = True,
+) -> pd.DataFrame | xr.Dataset:
+    """Get point-data from the GridMET database at 1-km resolution.
+
+    Parameters
+    ----------
+    coords : tuple or list of tuples
+        Coordinates of the location(s) of interest as a tuple (x, y)
+    dates : tuple or list, optional
+        Start and end dates as a tuple (start, end) or a list of years ``[2001, 2010, ...]``.
+    coords_id : list of int or str, optional
+        A list of identifiers for the coordinates. This option only applies when ``to_xarray``
+        is set to ``True``. If not provided, the coordinates will be enumerated.
+    crs : str, int, or pyproj.CRS, optional
+        The CRS of the input coordinates, defaults to ``EPSG:4326``.
+    variables : str or list
+        List of variables to be downloaded. The acceptable variables are:
+        ``pr``, ``rmax``, ``rmin``, ``sph``, ``srad``, ``th``, ``tmmn``, ``tmmx``, ``vs``,
+        ``bi``, ``fm100``, ``fm1000``, ``erc``, ``etr``, ``pet``, and ``vpd``.
+        Descriptions can be found `here <https://www.climatologylab.org/gridmet.html>`__.
+        Defaults to ``None``, i.e., all the variables are downloaded.
+    snow : bool, optional
+        Compute snowfall from precipitation and minimum temperature. Defaults to ``False``.
+    snow_params : dict, optional
+        Model-specific parameters as a dictionary that is passed to the snowfall function.
+        These parameters are only used if ``snow`` is ``True``. Two parameters are required:
+        ``t_rain`` (deg C) which is the threshold for temperature for considering rain and
+        ``t_snow`` (deg C) which is the threshold for temperature for considering snow.
+        The default values are ``{'t_rain': 2.5, 't_snow': 0.6}`` that are adopted from
+        https://doi.org/10.5194/gmd-11-1077-2018.
+    to_xarray : bool, optional
+        Return the data as an ``xarray.Dataset``. Defaults to ``False``.
+    conn_timeout : int, optional
+        Connection timeout in seconds, defaults to 1000.
+    validate_filesize : bool, optional
+        When set to ``True``, the function checks the file size of the previously
+        cached files and will re-download if the local filesize does not match
+        that of the remote. Defaults to ``True``. Setting this to ``False``
+        can be useful when you are sure that the cached files are not corrupted and just
+        want to get the combined dataset more quickly. This is faster because it avoids
+        web requests that are necessary for getting the file sizes.
+
+    Returns
+    -------
+    pandas.DataFrame or xarray.Dataset
+        Daily climate data for a single or list of locations.
+
+    Examples
+    --------
+    >>> import pygridmet as gridmet
+    >>> coords = (-1431147.7928, 318483.4618)
+    >>> dates = ("2000-01-01", "2000-01-31")
+    >>> clm = gridmet.get_bycoords(
+    ...     coords,
+    ...     dates,
+    ...     crs=3542,
+    ... )
+    >>> clm["pr (mm)"].mean()
+    9.677
+    """
+    gridmet = GridMET(dates, variables, snow)
+
+    coords_list, bounds = _coords_to_bounds(coords, gridmet.bounds, coords_id, crs, to_xarray)
+    n_pts = len(coords_list)
+
+    idx = list(coords_id) if coords_id is not None else range(n_pts)
+    names = list(gridmet.variables)
+    if snow:
+        names = [*names, "snow"]
+    name_mapping = {name: f"{name} ({gridmet.units[name]})" for name in names}
+    clm_dict = {}
+    for i, (lon, lat), bbox in zip(idx, coords_list, bounds):
+        ds = get_bygeom(
+            bbox, dates, crs, variables, snow, snow_params, conn_timeout, validate_filesize
+        )
+        ds = ds.sel(lon=round(lon, 6), lat=round(lat, 6), method="nearest")
+        df = ds.to_dataframe()[names].rename(columns=name_mapping)
+        clm_dict[i] = df
+
+    if to_xarray:
+        clm_ds = xr.concat(
+            (xr.Dataset.from_dataframe(clm) for clm in clm_dict.values()),
+            dim=pd.Index(list(clm_dict), name="id"),
+        )
+        clm_ds = clm_ds.rename(
+            {n: re.sub(r"\([^\)]*\)", "", str(n)).strip() for n in clm_ds.data_vars}
+        )
+        for v in clm_ds.data_vars:
+            clm_ds[v].attrs["units"] = gridmet.units[v]
+            clm_ds[v].attrs["long_name"] = gridmet.long_names[v]
+        lons, lats = zip(*coords_list)
+        clm_ds["lat"] = (("id",), list(lats))
+        clm_ds["lon"] = (("id",), list(lons))
+        return clm_ds
+
+    if n_pts == 1:
+        return next(iter(clm_dict.values()), pd.DataFrame())
+    return pd.concat(clm_dict.values(), keys=list(clm_dict), axis=1, names=["id", "variable"])
 
 
 def get_conus(
