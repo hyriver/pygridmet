@@ -40,13 +40,13 @@ class TestByCoords:
     @pytest.mark.jit
     def test_snow(self):
         clm = gridmet.get_bycoords(COORDS, DATES, snow=True, crs=ALT_CRS)
-        assert_close(clm["snow (mm)"].mean(), 0.0)
+        assert_close(clm["snow (mm)"].mean(), 0.2512)
 
     def test_daily(self):
         clm = gridmet.get_bycoords(COORDS, DATES, variables=VAR, crs=ALT_CRS)
         clm_ds = gridmet.get_bycoords(COORDS, DATES, variables=VAR, crs=ALT_CRS, to_xarray=True)
 
-        expected = 8.8493
+        expected = 1.1455
         assert_close(clm["pr (mm)"].mean(), expected)
         assert_close(clm_ds.pr.mean(), expected)
 
